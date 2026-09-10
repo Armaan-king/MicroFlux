@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+.pytest_cache/
+.hypothesis/
+
+# research data: raw TickForge cache and derived datasets are reproducible
+data/
+cache/
+runs/
+*.parquet
+
+# experiment outputs
+outputs/
+checkpoints/
+wandb/
+mlruns/
