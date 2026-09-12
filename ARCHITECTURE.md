@@ -378,24 +378,54 @@ Do not create abstractions simply because they might be useful later.
 
 ---
 
+# Decision Log
+
+Decisions made from measurement. Each records what was decided, why, and what it changes. Newest last.
+
+### D1 — Depth changes are state, not events (2026-09-12)
+
+**Decision.** The event vocabulary is `BUY_ORDER` / `SELL_ORDER` only. `BID_DEPTH_*` / `ASK_DEPTH_*` are dropped as event types; the book is a **state series observed at 1 Hz**.
+
+**Reason.** TickForge subscribes Binance `@depth` at 1000 ms. Measured on the 2026-09-09 BTCUSDT capture: 28,799 book updates in 8.00 h, inter-arrival CV = 0.00, Fano = 0.00. Depth arrival times are a clock, not a process; a Hawkes kernel fitted to them would recover the sampling rate and report it as excitation.
+
+**Consequences.** Stage 3 conditions order-flow intensity on 1 Hz book state (the Morariu-Patrichi & Pakkanen setup) rather than modelling depth as a point process. State resolution is bounded at 1 s until TickForge captures `@depth@100ms`. Trade-to-book alignment error is up to 1 s.
+
+### D2 — Fills collapse to aggressive orders (2026-09-12)
+
+**Decision.** Consecutive trades sharing `(timestamp_ns, aggressor)` are one event, carrying summed quantity and fill count. Implemented in `load.collapse_trades`.
+
+**Reason.** Binance `@trade` reports one row per fill; trade IDs are 100% contiguous. Up to 231 fills share a millisecond — one marketable order sweeping the book. Left raw, 90.8% of consecutive events have Δt = 0 and every point-process likelihood degenerates. Collapsed: 1,599,232 fills → 147,216 orders, 0.31% ties remain, and clustering survives (CV = 1.88, Fano = 11.4 at 1 s bins) — so the excitation is not a reporting artifact.
+
+**Consequences.** This reconstructs `@aggTrade` semantics. Fill count is a natural mark (levels swept). The 0.31% residual ties are opposite-side orders in the same ms and are kept as separate events in capture order.
+
+### D3 — Session continuity is checked, not assumed (2026-09-12)
+
+**Decision.** Files are joined into one sequence iff Binance `first_seq == prev.last_seq + 1` at every boundary. Implemented in `load.is_continuous`.
+
+**Reason.** The 2026-09-09 capture is 34 files with sequential session stamps and one snapshot; `capture_seq` runs 435 → 1,628,029 without restart and Binance sequence is contiguous across all 33 boundaries. These are file rolls, not reconnects. TickForge's rule that sessions must not be *presumed* continuous stands — this is the evidence that replaces the presumption.
+
+### D4 — Baseline Hawkes: exponential kernel, 2 types, MLE on train only (2026-09-12)
+
+**Decision.** `hawkes.py` implements a K-type exponential-kernel Hawkes process with Poisson as the α = 0 special case, sharing one likelihood. Fit on the first 70% by time; evaluated by held-out NLL/event and Ogata time-rescaling KS on the last 15%.
+
+**Result on 2026-09-09.** Test NLL/event: Poisson 0.999 → Hawkes 0.006. Self-excitation is fast and strong (branching 0.44 / 0.46, half-life ≈ 6 ms). Cross-excitation is slow (half-life ≈ 21 s). Spectral radius 0.67. KS on test 0.15 for both types — Hawkes fits much better than Poisson and still does not fit.
+
+**Open.** The 21 s cross-kernels coincide with a measured activity drift (6.0 → 3.2 orders/s across the capture) and may be absorbing non-stationarity rather than excitation. Two-timescale structure (ms and tens of seconds) is what a single exponential cannot represent. Next: time-varying baseline μ(t) as the non-stationarity control, then sum-of-exponentials kernels.
+
+---
+
 # Open Decisions
 
 Major unresolved questions currently include:
 
 ```text
-event taxonomy
-
 continuous vs discretized event marks
-
-event-count vs time-based windows
 
 which L2 features matter
 
 normalization strategy
 
-session handling
-
-Hawkes parameterization
+Hawkes kernel: time-varying baseline, multi-scale kernels
 
 market-state conditioning
 
