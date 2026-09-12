@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-from microflux.book import align, replay
+from microflux.book import replay
 from microflux.events import Events
 from microflux.hawkes import Params, loglik
 from microflux.residuals import ks_exp1, rescaled_residuals
@@ -41,13 +41,13 @@ def load_book(root: str, symbol: str, date: str) -> pl.DataFrame:
     return book
 
 
-def with_book(orders: pl.DataFrame, book: pl.DataFrame) -> pl.DataFrame:
-    """Each order joined to the last book row at or before it; orders before
-    the first book row are dropped."""
-    idx = align(orders["timestamp_ns"].to_numpy(), book["timestamp_ns"].to_numpy())
-    keep = idx >= 0
-    state = book[idx[keep]].drop("timestamp_ns", "capture_seq")
-    return pl.concat([orders.filter(pl.Series(keep)), state], how="horizontal")
+def state_function(book: pl.DataFrame, t0_ns: int, column: str, cuts: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """The book as a step function of time: (step_t, step_s), with `column`
+    bucketed by `cuts`. Book rows carry emission time; an order matched at
+    T sees the row emitted at or before T, which cannot include that order
+    -- leak-free, and up to one second stale."""
+    step_t = (book["timestamp_ns"].to_numpy() - t0_ns) / 1e9
+    return step_t, np.digitize(book[column].to_numpy(), cuts)
 
 
 def splits(T: float) -> dict[str, tuple[float, float]]:

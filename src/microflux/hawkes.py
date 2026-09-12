@@ -1,11 +1,13 @@
 """Multivariate Hawkes process: the model and its likelihood.
 
-    lambda_i(t) = mu_i(t) + sum_l sum_j sum_{t_k < t, e_k = j} alpha_lij exp(-beta_lij (t - t_k))
+    lambda_i(t) = mu_i(b(t), s(t)) + sum_l sum_j sum_{t_k < t, e_k = j} alpha_lij exp(-beta_lij (t - t_k))
 
-mu_i(t) is constant on each of B time blocks; each (excited i, exciting j)
-pair has L exponential scales. Both are controls for a way the plain model
-can lie: B > 1 stops a slow kernel absorbing non-stationarity, L > 1 stops
-one timescale standing in for several. Poisson is B = 1, L = 1, alpha = 0.
+The baseline is constant on each (time block b, state s) cell. Each
+(excited i, exciting j) pair has L exponential scales. These are controls for
+ways the plain model can lie: time blocks stop a slow kernel absorbing
+non-stationarity; kernel scales stop one timescale standing in for several;
+a state-dependent baseline stops a state-dependent *rate* being reported as
+a state-dependent *kernel*. Poisson is one block, one scale, alpha = 0.
 
 The exponential kernel is what keeps everything O(n): one recursion per
 (scale, pair). Time is seconds from the window start.
@@ -21,13 +23,17 @@ from microflux.events import Events
 
 @dataclass(frozen=True)
 class Params:
-    mu: np.ndarray     # (B, K)     exogenous rate per time block, per excited type
+    mu: np.ndarray     # (B, S, K)  exogenous rate per time block, per state, per excited type
     alpha: np.ndarray  # (L, K, J)  alpha[l, i, j]: exciting type j excites type i at scale l
     beta: np.ndarray   # (L, K, J)  decay rate of that excitation
-    edges: np.ndarray  # (B + 1,)   block boundaries; edges[0] = 0, edges[-1] = inf
+    edges: np.ndarray  # (B + 1,)   time-block boundaries; edges[0] = 0, edges[-1] = inf
 
     @property
     def K(self) -> int:
+        return self.mu.shape[2]
+
+    @property
+    def S(self) -> int:
         return self.mu.shape[1]
 
     @property
@@ -57,7 +63,7 @@ class Params:
 
 
 def block_edges(T: float, block_s: float | None) -> np.ndarray:
-    """Boundaries of the baseline blocks over [0, T]; the last block is open."""
+    """Boundaries of the time blocks over [0, T]; the last block is open."""
     if block_s is None:
         return np.array([0.0, np.inf])
     return np.append(np.arange(0.0, T, block_s), np.inf)
@@ -67,11 +73,36 @@ def block_of(edges: np.ndarray, t: np.ndarray) -> np.ndarray:
     return np.clip(np.searchsorted(edges, t, side="right") - 1, 0, len(edges) - 2)
 
 
-def baseline_cum(p: Params, t: np.ndarray) -> np.ndarray:
-    """(n, K): integral of mu_i from 0 to each t."""
-    lo, hi = p.edges[:-1], p.edges[1:]
-    width = np.clip(t[:, None] - lo[None, :], 0.0, (hi - lo)[None, :])
-    return width @ p.mu
+def _cells(edges: np.ndarray, ev: Events, S: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The joint partition of time by block and state.
+
+    Returns breakpoints (with inf last) and, per interval, its block and state.
+    A baseline with S = 1 ignores the state: every interval is state 0.
+    """
+    bp = np.union1d(edges, ev.step_t)
+    lo = bp[:-1]
+    st = ev.state_at(lo) if S > 1 else np.zeros(len(lo), np.int64)
+    return bp, block_of(edges, lo), st
+
+
+def time_in(edges: np.ndarray, ev: Events, a: float, b: float, S: int) -> np.ndarray:
+    """(B, S): seconds each (block, state) cell is active within [a, b)."""
+    bp, blk, st = _cells(edges, ev, S)
+    length = np.clip(np.minimum(bp[1:], b) - np.maximum(bp[:-1], a), 0.0, None)
+    out = np.zeros((len(edges) - 1, S))
+    np.add.at(out, (blk, st), length)
+    return out
+
+
+def baseline_cum(p: Params, ev: Events, t: np.ndarray) -> np.ndarray:
+    """(n, K): integral of mu_i from 0 to each t, through every cell on the way."""
+    bp, blk, st = _cells(p.edges, ev, p.S)
+    rate = p.mu[blk, st]                                  # (n_int, K)
+    width = np.diff(bp)
+    width[-1] = 0.0                                       # open last interval; never summed over
+    cum = np.vstack([np.zeros((1, p.K)), np.cumsum(rate * width[:, None], axis=0)])
+    k = np.searchsorted(bp, t, side="right") - 1
+    return cum[k] + rate[k] * (t - bp[k])[:, None]
 
 
 # --- kernel -----------------------------------------------------------------
@@ -108,7 +139,8 @@ def intensity(p: Params, ev: Events, R: np.ndarray | None = None) -> np.ndarray:
     """lambda_i(t_k) for every event k and excited type i. Shape (n, K)."""
     if R is None:
         R = excitation(ev.t, ev.e, p.beta)
-    return p.mu[block_of(p.edges, ev.t)] + np.einsum("lij,nlij->ni", p.alpha, R)
+    st = ev.s if p.S > 1 else np.zeros(len(ev), np.int64)
+    return p.mu[block_of(p.edges, ev.t), st] + np.einsum("lij,nlij->ni", p.alpha, R)
 
 
 def compensator(p: Params, ev: Events, a: float, b: float) -> np.ndarray:
@@ -118,7 +150,7 @@ def compensator(p: Params, ev: Events, a: float, b: float) -> np.ndarray:
     inside it contribute from their own time. Both are the one formula
     (alpha/beta)(exp(-beta max(a - t_k, 0)) - exp(-beta (b - t_k))).
     """
-    out = (baseline_cum(p, np.array([b])) - baseline_cum(p, np.array([a])))[0]
+    out = (baseline_cum(p, ev, np.array([b])) - baseline_cum(p, ev, np.array([a])))[0]
     inside = ev.t < b
     tl, el = ev.t[inside], ev.e[inside]
     for j in range(ev.J):

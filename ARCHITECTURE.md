@@ -113,8 +113,8 @@ Flat modules, one job each. Files appear when they have a purpose; the six plann
 ```text
 src/microflux/
 ├── load.py         TickForge partitions → frames; continuity check; fill → order collapse
-├── book.py         snapshot + diffs → 1 Hz book state; order ↔ book alignment
-├── events.py       Events: the (t, excited type, exciting type) contract
+├── book.py         snapshot + diffs → 1 Hz book state
+├── events.py       Events: (t, excited type, state, exciting type) + state as a step function of time
 ├── hawkes.py       Params, kernel recursion, intensity, compensator, log-likelihood
 ├── mle.py          fit_poisson, fit_hawkes (analytic gradient when β fixed), extrapolate
 ├── residuals.py    time-rescaling residuals, KS distance
@@ -426,7 +426,34 @@ Decisions made from measurement. Each records what was decided, why, and what it
 
 **Result.** Same-side excitation is stronger when the book is stacked on the aggressor's side. `BUY←BUY` branching 0.69 / 0.78 / 0.82 across ask-heavy / balanced / bid-heavy; `SELL←SELL` 0.73 / 0.75 / 0.68 — mirrored. The effect is largest at the **5 ms** scale (`BUY←BUY` 0.23 → 0.45; `SELL←SELL` 0.48 → 0.22), which corrects D5's expectation that 1 Hz state could not reach the fast scale: the state is a persistent condition, and a persistent condition modulates fast dynamics regardless of how often it is sampled.
 
-**Confound — open.** The baseline μ_i(t) is not state-dependent, yet the BUY share is 36% in ask-heavy books and 71% in bid-heavy ones. With the state persistent over many seconds, a state-dependent *rate* and a state-dependent *kernel* look alike: the only way this model can raise the buy rate in bid-heavy periods is through buy-in-bid-heavy events exciting more buys. Part of the kernel result may be baseline in disguise. Resolution: let μ depend on `(block, state)` — a joint cell index, still linear in parameters, still concave — and see whether the kernel differences survive.
+**Confound — open.** The baseline μ_i(t) is not state-dependent, yet the BUY share is 36% in ask-heavy books and 71% in bid-heavy ones. With the state persistent over many seconds, a state-dependent *rate* and a state-dependent *kernel* look alike: the only way this model can raise the buy rate in bid-heavy periods is through buy-in-bid-heavy events exciting more buys. Part of the kernel result may be baseline in disguise. → Resolved in D7.
+
+### D7 — State acts on the kernel, not only the rate; the sign flips with timescale (2026-09-12)
+
+**Decision.** The baseline is now μ_i(block, state) — `Params.mu` is `(B, S, K)`, and `Events` carries the state as a step function of time so the compensator can integrate it between events. State in the baseline and state in the kernel are independent switches (`fit_hawkes(state_baseline=)`, `events(kernel_state=)`). Tercile cuts now come from train **book rows** (time-weighted) rather than train orders: −0.425 / +0.600. A recovery test (`test_fit_separates_state_rate_from_state_kernel`) simulates a persistent state that doubles the rate and triples the excitation and checks the fit attributes each correctly.
+
+**Held-out gain over `Hawkes x5 + μ(t)`, test NLL/event:**
+
+```
+state in baseline only        +0.0027
+state in kernel only   (D6)   +0.0170
+both                          +0.0200
+both, state shifted by 2 h    −0.0006     ← same 198 parameters, no information
+```
+
+Nearly additive, and the shifted control is exactly zero. **The kernel effect is real and carries ~85% of what the state knows.** The confound was real in principle and small in practice. The exogenous rate does depend on state — BUY μ 0.50 / 0.63 / 0.90 /s, SELL 0.82 / 0.54 / 0.40 across ask-heavy / balanced / bid-heavy — and it now sits in μ where it belongs.
+
+**Result — the totals mislead; the scales do not.** With μ(t, s) free, total `BUY←BUY` branching is 0.71 / 0.81 / 0.76 — non-monotonic, and the D6 "monotonic with the book" story on totals does not survive (it was partly the confound and partly the order-based cuts). Per scale it is clean and mirrored across sides:
+
+```
+BUY<-BUY        ask-heavy  balanced  bid-heavy      SELL<-SELL     ask-heavy  balanced  bid-heavy
+    5 ms          0.231     0.334     0.448             5 ms          0.479     0.346     0.232
+    5 s           0.172     0.132     0.054            50 s           0.029     0.114     0.186
+```
+
+**Fast same-side excitation (5 ms) is strongest when the book is stacked on the aggressor's side** — a buy into a bid-heavy book roughly doubles its immediate follow-on. **Slow same-side excitation (5–50 s) is strongest when the book is stacked against the aggressor** — a buy into an ask-heavy book spawns three times the follow-on over seconds. The two effects have opposite signs and partially cancel in the total, which is why D6's totals were ambiguous. The reading: fast follow-on is momentum into thin liquidity; slow follow-on is patient execution against resistance — a metaorder working through a book that is fighting it.
+
+**Consequences.** (1) Any state-dependence claim must be made per timescale; totals hide sign flips. (2) The exogenous-rate dependence on imbalance (the classic queue-imbalance result) is reproduced and is separate from the propagation effect. (3) One 8-hour session; none of this is replicated. (4) KS is unmoved (0.147 / 0.128): the state is not what the model is missing. Marks and millisecond quantisation remain the candidates.
 
 ---
 

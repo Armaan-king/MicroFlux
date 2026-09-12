@@ -12,7 +12,6 @@ resolution the capture has (see ARCHITECTURE.md D1).
 
 import heapq
 
-import numpy as np
 import polars as pl
 
 DEPTH = 10  # levels summed for depth; imbalance uses 1 and 5
@@ -89,13 +88,3 @@ def replay(snapshot: pl.DataFrame, updates: pl.DataFrame) -> pl.DataFrame:
         orient="row",
     )
 
-
-def align(order_ts: np.ndarray, book_ts: np.ndarray) -> np.ndarray:
-    """Index of the last book row emitted at or before each order; -1 if none.
-
-    Book rows carry emission time and orders carry match time, both Binance
-    server clocks. A row emitted at E <= T cannot include the effect of a
-    trade matched at T, so this is leak-free -- and up to one second stale,
-    which is the resolution the capture has.
-    """
-    return np.searchsorted(book_ts, order_ts, side="right") - 1

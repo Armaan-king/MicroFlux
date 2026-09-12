@@ -23,7 +23,7 @@ def rescaled_residuals(p: Params, ev: Events, a: float, b: float) -> list[np.nda
     onehot = np.eye(ev.J)[ev.e]
     counts = np.cumsum(onehot, axis=0) - onehot  # exciting-type-j events strictly before k
     br = p.branching_by_scale
-    Lam = baseline_cum(p, ev.t) + counts @ br.sum(0).T - np.einsum("lij,nlij->ni", br, R)
+    Lam = baseline_cum(p, ev, ev.t) + counts @ br.sum(0).T - np.einsum("lij,nlij->ni", br, R)
     inside = ev.window(a, b)
     return [np.diff(Lam[inside & (ev.m == i), i]) for i in range(ev.K)]
 

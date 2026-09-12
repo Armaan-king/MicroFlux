@@ -21,7 +21,7 @@ import time
 
 from microflux.experiment import HALF_LIVES, SCALES, TYPES, evaluate, load_orders, matrix, splits
 from microflux.events import events
-from microflux.hawkes import Params
+from microflux.hawkes import Params, block_edges
 from microflux.mle import extrapolate, fit_hawkes, fit_poisson
 
 
@@ -40,19 +40,19 @@ def main() -> None:
     split = splits(T)
     T_train = split["train"][1]
     tr = ev.t < T_train
-    train = events(ev.t[tr], ev.m[tr], K=2)
-    block = args.block_minutes * 60
+    train = ev.before(T_train)
+    blocks = block_edges(T_train, args.block_minutes * 60)
     print(f"{len(ev):,} orders over {T / 3600:.2f}h   train={tr.sum():,}  "
           f"BUY={int((ev.m == 0).sum()):,} SELL={int((ev.m == 1).sum()):,}   "
           f"baseline blocks of {args.block_minutes:g} min")
 
     ladder = [
         ("Poisson",           lambda: fit_poisson(train, T_train)),
-        ("Poisson + mu(t)",   lambda: fit_poisson(train, T_train, block_s=block)),
+        ("Poisson + mu(t)",   lambda: fit_poisson(train, T_train, blocks)),
         ("Hawkes",            lambda: fit_hawkes(train, T_train)),
-        ("Hawkes + mu(t)",    lambda: fit_hawkes(train, T_train, block_s=block)),
+        ("Hawkes + mu(t)",    lambda: fit_hawkes(train, T_train, blocks)),
         ("Hawkes x5",         lambda: fit_hawkes(train, T_train, scales=SCALES)),
-        ("Hawkes x5 + mu(t)", lambda: fit_hawkes(train, T_train, block_s=block, scales=SCALES)),
+        ("Hawkes x5 + mu(t)", lambda: fit_hawkes(train, T_train, blocks, SCALES)),
     ]
 
     fits: dict[str, Params] = {}
@@ -62,7 +62,7 @@ def main() -> None:
         p = fit()
         secs = time.perf_counter() - t0
         fits[name] = p
-        rows.append((name, evaluate(extrapolate(p, T_train), ev, split), p.spectral_radius, secs))
+        rows.append((name, evaluate(extrapolate(p, ev, T_train), ev, split), p.spectral_radius, secs))
         print(f"  fitted {name:<20} {secs:6.1f}s")
 
     print(f"\n{'model':<20}{'train':>9}{'val':>9}{'test':>9}   {'KS BUY':>7} {'KS SELL':>8}   {'rho':>6}")
@@ -79,7 +79,7 @@ def main() -> None:
         matrix(f"[{name}]  branching alpha/beta", p.branching)
         matrix(f"[{name}]  half-life (s)", p.half_lives[0], fmt="{:10.3f}")
     p = fits["Hawkes + mu(t)"]
-    print(f"\nbaseline mu(t) across train blocks, BUY: {p.mu[:, 0].min():.3f} .. {p.mu[:, 0].max():.3f} /s")
+    print(f"\nbaseline mu(t) across train blocks, BUY: {p.mu[:, 0, 0].min():.3f} .. {p.mu[:, 0, 0].max():.3f} /s")
 
     print("\n" + "=" * 70)
     print("B: which timescales carry the excitation?  (branching per scale)")

@@ -6,9 +6,9 @@ still optimise to *something* -- it just will not be the truth, and nothing
 downstream would notice.
 
 Three truths: the classic single-exponential model with free decay; the
-piecewise-baseline multi-scale model with a fixed decay grid; and a
-state-dependent model where the same side excites differently depending on
-the state it landed in.
+piecewise-baseline multi-scale model with a fixed decay grid; and the
+confound itself -- a persistent state that changes both the exogenous rate
+and the self-excitation, which the fit must attribute correctly.
 """
 
 import numpy as np
@@ -16,21 +16,23 @@ import pytest
 from scipy.optimize import check_grad
 
 from microflux.events import events
-from microflux.hawkes import Params, block_edges, loglik
+from microflux.hawkes import Params, block_edges, loglik, time_in
 from microflux.mle import extrapolate, fit_hawkes, fit_poisson, fixed_objective
 from microflux.residuals import ks_exp1, rescaled_residuals
-from microflux.simulate import simulate
+from microflux.simulate import random_states, simulate
+
+ONE = np.array([0.0, np.inf])
 
 SINGLE = Params(
-    mu=np.array([[0.5, 0.3]]),
+    mu=np.array([[[0.5, 0.3]]]),
     alpha=np.array([[[0.8, 0.2], [0.3, 0.6]]]),
     beta=np.array([[[2.0, 3.0], [1.5, 2.5]]]),
-    edges=np.array([0.0, np.inf]),
+    edges=ONE,
 )
 
 SCALES = np.array([20.0, 0.5])  # fast and slow decay, known to the fit
 MULTI = Params(
-    mu=np.array([[0.6, 0.2], [0.2, 0.6]]),  # baseline swaps sides at t = 10000
+    mu=np.array([[[0.6, 0.2]], [[0.2, 0.6]]]),  # baseline swaps sides at t = 10000
     alpha=np.array([
         [[4.0, 1.0], [1.0, 4.0]],    # fast scale: branching 0.2 / 0.05
         [[0.1, 0.05], [0.05, 0.1]],  # slow scale: branching 0.2 / 0.1
@@ -39,15 +41,15 @@ MULTI = Params(
     edges=np.array([0.0, 10_000.0, np.inf]),
 )
 
-# Exciting types are (side, state): columns BUY@0, SELL@0, BUY@1, SELL@1.
-# In state 1 self-excitation is three times stronger. Cross is unchanged.
+# The confound. Two states, persistent (mean dwell 30 s). In state 1 the
+# exogenous BUY rate doubles AND BUY<-BUY self-excitation triples. Exciting
+# types are (side, state): columns BUY@0, SELL@0, BUY@1, SELL@1.
 STATE = Params(
-    mu=np.array([[0.5, 0.5]]),
-    alpha=np.array([[[2.0, 0.5, 6.0, 0.5], [0.5, 2.0, 0.5, 6.0]]]),
+    mu=np.array([[[0.4, 0.4], [0.8, 0.4]]]),
+    alpha=np.array([[[2.0, 0.5, 6.0, 0.5], [0.5, 2.0, 0.5, 2.0]]]),
     beta=np.full((1, 2, 4), 20.0),
-    edges=np.array([0.0, np.inf]),
+    edges=ONE,
 )
-STATE_PROB = np.array([0.6, 0.4])
 
 
 @pytest.fixture(scope="module")
@@ -66,9 +68,10 @@ def multi():
 
 @pytest.fixture(scope="module")
 def stated():
-    ev = simulate(STATE, T=20_000.0, seed=3, state_prob=STATE_PROB)
+    st, ss = random_states(T=20_000.0, S=2, mean_dwell=30.0, seed=3)
+    ev = simulate(STATE, T=20_000.0, seed=3, step_t=st, step_s=ss)
     assert 10_000 < len(ev) < 60_000
-    assert ev.J == 4
+    assert ev.S == 2 and ev.J == 4
     return ev
 
 
@@ -80,29 +83,37 @@ def test_single_scale_free_beta_recovers_truth(single):
 
 
 def test_multi_scale_piecewise_baseline_recovers_truth(multi):
-    got = fit_hawkes(multi, T=multi.t[-1], block_s=10_000.0, scales=SCALES)
+    got = fit_hawkes(multi, T=multi.t[-1], edges=block_edges(multi.t[-1], 10_000.0), scales=SCALES)
     np.testing.assert_allclose(got.mu, MULTI.mu, rtol=0.20)
     np.testing.assert_allclose(got.branching, MULTI.branching, rtol=0.20)
     # The excitation must land on the right timescale, not just sum right.
     np.testing.assert_allclose(got.branching_by_scale[0], MULTI.branching_by_scale[0], rtol=0.30)
 
 
-def test_state_dependent_excitation_recovers_truth(stated):
-    """The fit must see that a BUY in state 1 triggers three times the
-    follow-on of a BUY in state 0 -- and not smear the two together."""
-    got = fit_hawkes(stated, T=stated.t[-1], scales=np.array([20.0]))
+def test_fit_separates_state_rate_from_state_kernel(stated):
+    """The confound, resolved: with both mu(s) and alpha(s) free, the fit must
+    put the doubled rate in mu and the tripled excitation in alpha."""
+    got = fit_hawkes(stated, T=stated.t[-1], scales=np.array([20.0]), state_baseline=True)
+    np.testing.assert_allclose(got.mu, STATE.mu, rtol=0.25)
     np.testing.assert_allclose(got.branching, STATE.branching, rtol=0.25)
     ratio = got.branching[0, 2] / got.branching[0, 0]  # BUY<-BUY@1 over BUY<-BUY@0
     assert 2.2 < ratio < 3.8
 
 
-def test_state_free_fit_on_state_data_averages_the_states(stated):
-    """Collapsing the state should give roughly the frequency-weighted mean of
-    the two per-state kernels -- the number the state model must beat."""
+def test_state_free_fit_blends_the_states(stated):
+    """Dropping the state gives a fit between the two per-state truths -- the
+    number a state model has to beat, and a check that S=1 still works."""
     flat = events(stated.t, stated.m, stated.K)
     got = fit_hawkes(flat, T=flat.t[-1], scales=np.array([20.0]))
-    expected = STATE.branching[0, 0] * STATE_PROB[0] + STATE.branching[0, 2] * STATE_PROB[1]
-    assert got.branching[0, 0] == pytest.approx(expected, rel=0.25)
+    assert STATE.branching[0, 0] < got.branching[0, 0] < STATE.branching[0, 2]
+    assert STATE.mu[0, 0, 0] < got.mu[0, 0, 0] < STATE.mu[0, 1, 0]
+
+
+def test_time_in_partitions_the_window(stated):
+    T = stated.t[-1]
+    tin = time_in(block_edges(T, 5_000.0), stated, 1_000.0, 17_000.0, S=2)
+    assert tin.sum() == pytest.approx(16_000.0)
+    assert tin.shape == (4, 2)
 
 
 def test_hawkes_beats_poisson_on_hawkes_data(single):
@@ -110,46 +121,46 @@ def test_hawkes_beats_poisson_on_hawkes_data(single):
     assert loglik(fit_hawkes(single, T), single, 0.0, T) > loglik(fit_poisson(single, T), single, 0.0, T)
 
 
-def test_rescaled_residuals_are_exp1_under_truth(multi):
+def test_rescaled_residuals_are_exp1_under_truth(stated):
     """Time-rescaling with the true parameters gives unit exponentials; with
     the Poisson fit it does not. That is what makes it a goodness-of-fit
-    measure on real data rather than another likelihood."""
-    T = multi.t[-1]
-    for r in rescaled_residuals(MULTI, multi, 0.0, T):
+    measure on real data rather than another likelihood. On the state model,
+    so the state-dependent baseline integral is exercised."""
+    T = stated.t[-1]
+    for r in rescaled_residuals(STATE, stated, 0.0, T):
         assert ks_exp1(r) < 0.02
-    for r in rescaled_residuals(fit_poisson(multi, T), multi, 0.0, T):
+    for r in rescaled_residuals(fit_poisson(stated, T, state_baseline=True), stated, 0.0, T):
         assert ks_exp1(r) > 0.05
 
 
-def test_heldout_loglik_is_additive_across_a_split(multi):
-    """LL[0,T] == LL[0,a] + LL[a,T], with a inside the second baseline block so
-    the compensator has to handle a window that starts mid-block."""
-    T, a = multi.t[-1], multi.t[-1] * 0.7
-    whole = loglik(MULTI, multi, 0.0, T)
-    parts = loglik(MULTI, multi, 0.0, a) + loglik(MULTI, multi, a, T)
+def test_heldout_loglik_is_additive_across_a_split(stated):
+    """LL[0,T] == LL[0,a] + LL[a,T], with a mid-way so the compensator has to
+    handle a window that starts inside a state interval."""
+    T, a = stated.t[-1], stated.t[-1] * 0.7
+    whole = loglik(STATE, stated, 0.0, T)
+    parts = loglik(STATE, stated, 0.0, a) + loglik(STATE, stated, a, T)
     assert abs(whole - parts) < 1e-6 * abs(whole)
 
 
 def test_analytic_gradient_matches_finite_differences(stated):
     """The fixed-beta path ships its own gradient. Check it against finite
     differences at a point away from the optimum, where a wrong sign or a
-    dropped term is loud, and check its value agrees with `loglik`. Done on
-    the state model so the K != J indexing is exercised."""
+    dropped term is loud, and check its value agrees with `loglik`."""
     T = stated.t[-1]
     edges = block_edges(T, 10_000.0)
-    obj = fixed_objective(stated, T, edges, STATE.beta)
-    theta = np.log(np.concatenate([np.full(4, 0.4), np.full(8, 1.0)]))
+    obj = fixed_objective(stated, T, edges, STATE.beta, S=2)
+    theta = np.log(np.concatenate([np.full(8, 0.4), np.full(8, 1.0)]))
 
     value, _ = obj(theta)
-    p = Params(np.full((2, 2), 0.4), np.full((1, 2, 4), 1.0), STATE.beta, edges)
+    p = Params(np.full((2, 2, 2), 0.4), np.full((1, 2, 4), 1.0), STATE.beta, edges)
     assert value == pytest.approx(-loglik(p, stated, 0.0, T), rel=1e-9)
 
     err = check_grad(lambda th: obj(th)[0], lambda th: obj(th)[1], theta, epsilon=1e-6)
     assert err < 1e-3 * np.linalg.norm(obj(theta)[1])
 
 
-def test_extrapolate_freezes_baseline_at_train_mean(multi):
-    p = extrapolate(MULTI, 15_000.0)
+def test_extrapolate_freezes_baseline_per_state(stated):
+    p = extrapolate(STATE, stated, 15_000.0)
     assert p.edges[-2] == 15_000.0
-    np.testing.assert_allclose(p.mu[-1], MULTI.mu.mean(0))
-    assert loglik(p, multi, 0.0, 15_000.0) == pytest.approx(loglik(MULTI, multi, 0.0, 15_000.0))
+    np.testing.assert_allclose(p.mu[-1], STATE.mu[0])  # one block: the mean is itself, per state
+    assert loglik(p, stated, 0.0, 15_000.0) == pytest.approx(loglik(STATE, stated, 0.0, 15_000.0))

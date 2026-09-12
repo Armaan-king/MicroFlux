@@ -1,18 +1,19 @@
-"""Stage 3: does the book state an order lands in change what it triggers?
+"""Stage 3: does the book state an order lands in change what it triggers --
+or does it only change how many orders arrive?
 
-Three fits of the same Hawkes x5 + mu(t) model, differing only in how the
-exciting type is defined:
+State = L5-imbalance tercile of the last book row at or before the order, as
+a step function of time. Seven fits, differing only in where the state enters:
 
-    no state          e = side
-    state             e = (side, L5-imbalance tercile at the order)
-    shuffled state    e = (side, a random permutation of those terciles)
+    Poisson + mu(t)                      no state
+    Poisson + mu(t,s)                    state changes the rate, nothing propagates
+    Hawkes x5 + mu(t)                    D5: no state
+    Hawkes x5 + mu(t,s)                  state in the baseline only
+    Hawkes x5 + mu(t)   + kernel(s)      D6: state in the kernel only -- the confounded model
+    Hawkes x5 + mu(t,s) + kernel(s)      both free: the fit decides what the state does
+    ... same, state series shifted 2 h   control: same parameters, no information
 
-The shuffled fit has exactly the parameters of the state fit and none of the
-information. Whatever held-out gain it shows is what extra parameters buy on
-their own; the state must beat it to have said anything.
-
-Tercile cuts are computed on train orders only. Spread is not a state
-variable here: it is one tick 99.9% of the time on this capture.
+Tercile cuts come from train book rows only. Spread is not a state variable
+here: it is one tick 99.9% of the time on this capture.
 
     python fit_state.py [--root C:/tickforge-runs] [--date 2026-09-09] [--block-minutes 15]
 """
@@ -22,11 +23,12 @@ import time
 
 import numpy as np
 
-from microflux.experiment import (
-    HALF_LIVES, SCALES, TYPES, evaluate, load_book, load_orders, splits, with_book,
-)
 from microflux.events import events
-from microflux.mle import extrapolate, fit_hawkes
+from microflux.experiment import (
+    HALF_LIVES, SCALES, TYPES, evaluate, load_book, load_orders, splits, state_function,
+)
+from microflux.hawkes import block_edges
+from microflux.mle import extrapolate, fit_hawkes, fit_poisson
 
 STATES = ("ask-heavy", "balanced", "bid-heavy")
 
@@ -37,62 +39,83 @@ def main() -> None:
     ap.add_argument("--symbol", default="BTCUSDT")
     ap.add_argument("--date", default="2026-09-09")
     ap.add_argument("--block-minutes", type=float, default=15.0)
-    ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--shift-hours", type=float, default=2.0)
     args = ap.parse_args()
 
-    orders = with_book(load_orders(args.root, args.symbol, args.date), load_book(args.root, args.symbol, args.date))
-    t, m, imb = orders["t"].to_numpy(), orders["m"].to_numpy(), orders["imb5"].to_numpy()
+    orders = load_orders(args.root, args.symbol, args.date)
+    book = load_book(args.root, args.symbol, args.date)
+    t, m = orders["t"].to_numpy(), orders["m"].to_numpy()
     T = t[-1]
     split = splits(T)
     T_train = split["train"][1]
-    tr = t < T_train
-    block = args.block_minutes * 60
+    blocks = block_edges(T_train, args.block_minutes * 60)
 
-    cuts = np.percentile(imb[tr], [100 / 3, 200 / 3])
-    state = np.digitize(imb, cuts)
-    shuffled = np.random.default_rng(args.seed).permutation(state)
-    print(f"{len(t):,} orders with book state   train={tr.sum():,}   "
-          f"imb5 tercile cuts (train) = {cuts[0]:+.3f}, {cuts[1]:+.3f}")
+    t0 = orders["timestamp_ns"][0]
+    book_t = (book["timestamp_ns"].to_numpy() - t0) / 1e9
+    cuts = np.percentile(book["imb5"].to_numpy()[book_t < T_train], [100 / 3, 200 / 3])
+    step_t, step_s = state_function(book, t0, "imb5", cuts)
+    shifted = np.roll(step_s, int(args.shift_hours * 3600))  # book rows are 1 Hz
+
+    def seq(kernel_state: bool, states=step_s):
+        return events(t, m, 2, step_t, states, 3, kernel_state=kernel_state)
+
+    ev_flat, ev_state, ev_shift = seq(False), seq(True), seq(True, shifted)
+    tr = ev_state.before(T_train)
+    print(f"{len(t):,} orders over {T / 3600:.2f}h   train={len(tr):,}   "
+          f"imb5 tercile cuts (train book rows) = {cuts[0]:+.3f}, {cuts[1]:+.3f}")
     for s, name in enumerate(STATES):
-        n = int((state[tr] == s).sum())
-        print(f"   {name:<10} n={n:>7,}   BUY share={100 * (m[tr][state[tr] == s] == 0).mean():5.1f}%")
+        n = int((tr.s == s).sum())
+        print(f"   {name:<10} n={n:>7,}   BUY share={100 * (tr.m[tr.s == s] == 0).mean():5.1f}%")
 
-    variants = {
-        "no state":       events(t, m, 2),
-        "state":          events(t, m, 2, state, 3),
-        "shuffled state": events(t, m, 2, shuffled, 3),
-    }
+    ladder = [
+        ("Poisson + mu(t)",            ev_flat,  lambda ev: fit_poisson(ev, T_train, blocks)),
+        ("Poisson + mu(t,s)",          ev_flat,  lambda ev: fit_poisson(ev, T_train, blocks, state_baseline=True)),
+        ("Hawkes x5 + mu(t)",          ev_flat,  lambda ev: fit_hawkes(ev, T_train, blocks, SCALES)),
+        ("Hawkes x5 + mu(t,s)",        ev_flat,  lambda ev: fit_hawkes(ev, T_train, blocks, SCALES, state_baseline=True)),
+        ("Hawkes x5 + mu(t) + k(s)",   ev_state, lambda ev: fit_hawkes(ev, T_train, blocks, SCALES)),
+        ("Hawkes x5 + mu(t,s) + k(s)", ev_state, lambda ev: fit_hawkes(ev, T_train, blocks, SCALES, state_baseline=True)),
+        ("  ... shifted state",        ev_shift, lambda ev: fit_hawkes(ev, T_train, blocks, SCALES, state_baseline=True)),
+    ]
     fits, rows = {}, []
-    for name, ev in variants.items():
-        train = events(ev.t[tr], ev.m[tr], 2, None if ev.J == 2 else (ev.e[tr] // 2), ev.J // 2)
-        t0 = time.perf_counter()
-        p = fit_hawkes(train, T_train, block_s=block, scales=SCALES)
-        secs = time.perf_counter() - t0
+    for name, ev, fit in ladder:
+        t_start = time.perf_counter()
+        p = fit(ev.before(T_train))
+        secs = time.perf_counter() - t_start
         fits[name] = p
-        rows.append((name, evaluate(extrapolate(p, T_train), ev, split), secs))
-        print(f"  fitted {name:<16} {secs:6.1f}s   params={p.mu.size + p.alpha.size}")
+        rows.append((name, evaluate(extrapolate(p, ev, T_train), ev, split)))
+        print(f"  fitted {name:<28} {secs:6.1f}s   params={p.mu.size + p.alpha.size}")
 
-    print(f"\n{'model':<16}{'train':>9}{'val':>9}{'test':>9}   {'KS BUY':>7} {'KS SELL':>8}")
-    print(f"{'':<16}{'NLL/event':>27}   {'test, Exp(1)':>16}")
-    for name, ev_, _ in rows:
-        print(f"{name:<16}{ev_['train']:9.4f}{ev_['val']:9.4f}{ev_['test']:9.4f}   "
-              f"{ev_['ks'][0]:7.4f} {ev_['ks'][1]:8.4f}")
-    base, real, shuf = (r[1]["test"] for r in rows)
-    print(f"\nheld-out gain over no-state, test NLL/event:  state {base - real:+.4f}   shuffled {base - shuf:+.4f}")
+    print(f"\n{'model':<28}{'train':>9}{'val':>9}{'test':>9}   {'KS BUY':>7} {'KS SELL':>8}")
+    print(f"{'':<28}{'NLL/event':>27}   {'test, Exp(1)':>16}")
+    for name, r in rows:
+        print(f"{name:<28}{r['train']:9.4f}{r['val']:9.4f}{r['test']:9.4f}   {r['ks'][0]:7.4f} {r['ks'][1]:8.4f}")
+    base = rows[2][1]["test"]
+    print(f"\nheld-out gain over Hawkes x5 + mu(t), test NLL/event:")
+    for name, r in rows[3:]:
+        print(f"   {name:<28} {base - r['test']:+.4f}")
 
-    p = fits["state"]
-    print("\n" + "=" * 70)
-    print("branching by state of the EXCITING order   (row = excited, col = exciting)")
-    print("=" * 70)
-    for s, name in enumerate(STATES):
-        print(f"\n[{name}]")
-        print(f"{'':>8}{'<-BUY':>10}{'<-SELL':>10}")
-        for i in range(2):
-            print(f"{TYPES[i]:>8}" + "".join(f"{p.branching[i, j + 2 * s]:10.4f}" for j in range(2)))
+    print("\n" + "=" * 72)
+    print("A: self-excitation by state of the exciting order  --  kernel-only vs both free")
+    print("=" * 72)
+    print(f"{'':<12}{'ask-heavy':>12}{'balanced':>12}{'bid-heavy':>12}    {'range':>8}")
+    for name in ("Hawkes x5 + mu(t) + k(s)", "Hawkes x5 + mu(t,s) + k(s)"):
+        p = fits[name]
+        print(f"[{name}]")
+        for pair, (i, j) in (("BUY<-BUY", (0, 0)), ("SELL<-SELL", (1, 1))):
+            v = [p.branching[i, j + 2 * s] for s in range(3)]
+            print(f"{pair:<12}" + "".join(f"{x:12.4f}" for x in v) + f"    {max(v) - min(v):8.4f}")
 
-    print("\n" + "=" * 70)
-    print("where does the state act?  self-excitation branching per scale")
-    print("=" * 70)
+    p = fits["Hawkes x5 + mu(t,s) + k(s)"]
+    print("\n" + "=" * 72)
+    print("B: exogenous rate by state  --  train-mean of mu(t,s), orders/s")
+    print("=" * 72)
+    print(f"{'':<12}{'ask-heavy':>12}{'balanced':>12}{'bid-heavy':>12}")
+    for i in range(2):
+        print(f"{TYPES[i]:<12}" + "".join(f"{p.mu[:-1, s, i].mean() if p.mu.shape[0] > 1 else p.mu[0, s, i]:12.4f}" for s in range(3)))
+
+    print("\n" + "=" * 72)
+    print("C: where the state acts  --  self-excitation branching per scale, both free")
+    print("=" * 72)
     for pair, (i, j) in (("BUY<-BUY", (0, 0)), ("SELL<-SELL", (1, 1))):
         print(f"\n{pair:<12}" + "".join(f"{s:>12}" for s in STATES))
         for l, h in enumerate(HALF_LIVES):
