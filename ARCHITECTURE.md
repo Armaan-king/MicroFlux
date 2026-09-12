@@ -422,7 +422,17 @@ Decisions made from measurement. Each records what was decided, why, and what it
 
 **Held-out (test NLL/event).** Poisson 0.999 → Hawkes 0.045 → Hawkes x5 −0.099. KS(Exp1) on test: 0.20/0.24 → 0.17/0.15 → 0.15/0.14. Each rung helps; none fits. Note the free-β `Hawkes + μ(t)` forecasts *worse* than `Hawkes` (0.076 vs 0.045): the spurious 21 s kernel was a crude rate tracker, and a train-mean baseline is not. A misspecified model can out-forecast a controlled one — the control is for interpretation, not prediction.
 
-**Consequences.** (1) Any claim about cross-side propagation must be made with a drifting baseline or it is not a claim about excitation. (2) The dominant structure is same-side, millisecond-scale, and near-critical — Stage 3 state-dependence can modulate the ≥ 0.5 s scales and the baseline but cannot reach the 5 ms burst with 1 Hz book state. (3) Remaining misfit candidates, in order: millisecond timestamp quantisation against a 5 ms kernel, unmodelled marks (fill count / size), and intraday seasonality inside 15-min blocks.
+**Consequences.** (1) Any claim about cross-side propagation must be made with a drifting baseline or it is not a claim about excitation. (2) The dominant structure is same-side, millisecond-scale, and near-critical. (3) Remaining misfit candidates, in order: millisecond timestamp quantisation against a 5 ms kernel, unmodelled marks (fill count / size), and intraday seasonality inside 15-min blocks.
+
+### D6 — State enters as the exciting type; imbalance modulates propagation (2026-09-12)
+
+**Decision.** State-dependence follows Morariu-Patrichi & Pakkanen: the kernel from an order depends on the book state when that order happened. Implemented by widening the *exciting* type to `(side, state)` while the *excited* type stays `side` (`hawkes.Events`, `hawkes.events`). The recursion, concavity and analytic gradient are unchanged. State = L5-imbalance tercile at the last book row at or before the order, cuts fit on train. Spread is dropped as a state variable: one tick 99.9% of the time on this capture. Book state is replayed from snapshot + diffs in `book.py` and cached.
+
+**Control.** A shuffled-state fit has the state fit's 106 parameters and none of its information. Held-out test gain over the state-free model: **state +0.0176 NLL/event, shuffled +0.0001.** The state carries real information; the parameters alone buy nothing.
+
+**Result.** Same-side excitation is stronger when the book is stacked on the aggressor's side. `BUY←BUY` branching 0.69 / 0.78 / 0.82 across ask-heavy / balanced / bid-heavy; `SELL←SELL` 0.73 / 0.75 / 0.68 — mirrored. The effect is largest at the **5 ms** scale (`BUY←BUY` 0.23 → 0.45; `SELL←SELL` 0.48 → 0.22), which corrects D5's expectation that 1 Hz state could not reach the fast scale: the state is a persistent condition, and a persistent condition modulates fast dynamics regardless of how often it is sampled.
+
+**Confound — open.** The baseline μ_i(t) is not state-dependent, yet the BUY share is 36% in ask-heavy books and 71% in bid-heavy ones. With the state persistent over many seconds, a state-dependent *rate* and a state-dependent *kernel* look alike: the only way this model can raise the buy rate in bid-heavy periods is through buy-in-bid-heavy events exciting more buys. Part of the kernel result may be baseline in disguise. Resolution: let μ depend on `(block, state)` — a joint cell index, still linear in parameters, still concave — and see whether the kernel differences survive.
 
 ---
 
