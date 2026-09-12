@@ -142,10 +142,11 @@ def test_heldout_loglik_is_additive_across_a_split(stated):
     assert abs(whole - parts) < 1e-6 * abs(whole)
 
 
-def test_analytic_gradient_matches_finite_differences(stated):
-    """The fixed-beta path ships its own gradient. Check it against finite
-    differences at a point away from the optimum, where a wrong sign or a
-    dropped term is loud, and check its value agrees with `loglik`."""
+def test_torch_objective_matches_numpy_loglik_and_finite_differences(stated):
+    """The fixed-beta objective is torch; the reference likelihood is numpy.
+    They must agree to 1e-9, and the autograd gradient must match finite
+    differences at a point away from the optimum -- a dropped term in the
+    objective is loud there."""
     T = stated.t[-1]
     edges = block_edges(T, 10_000.0)
     obj = fixed_objective(stated, T, edges, STATE.beta, S=2)

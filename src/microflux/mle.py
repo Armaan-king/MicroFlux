@@ -2,19 +2,24 @@
 
 Poisson has a closed form. Hawkes is L-BFGS-B over log-parameters, so
 positivity is free and the optimiser walks in the natural scale of rates.
-With the decay rates fixed the likelihood is concave in (mu, alpha), the
-recursion runs once, and the gradient is analytic -- that path is fast and
-cannot land in a wrong optimum. Free decay is the classic single-exponential
-model and keeps numerical gradients.
+
+With the decay rates fixed, the recursion is data rather than parameter:
+it runs once in numba, and the objective on top of it is a few tensor
+operations that PyTorch differentiates. scipy keeps the optimiser -- it is
+robust and needs nothing from torch but a function and a gradient. Free
+decay is the classic single-exponential model; the recursion is inside its
+likelihood, so it keeps numerical gradients.
 """
 
 import numpy as np
+import torch
 from scipy.optimize import minimize
 
 from microflux.events import Events
 from microflux.hawkes import Params, block_of, excitation, loglik, time_in
 
 OPEN = np.array([0.0, np.inf])
+torch.set_default_dtype(torch.float64)  # match numpy and scipy exactly
 
 
 def fit_poisson(ev: Events, T: float, edges: np.ndarray = OPEN, state_baseline: bool = False) -> Params:
@@ -31,42 +36,39 @@ def fit_poisson(ev: Events, T: float, edges: np.ndarray = OPEN, state_baseline: 
 def fixed_objective(ev: Events, T: float, edges: np.ndarray, beta: np.ndarray, S: int = 1):
     """Negative log-likelihood and its gradient in log(mu, alpha), beta fixed.
 
-    With beta fixed the recursion R never changes, and the compensator kernel
-    term is (alpha / beta) * S with S precomputed, so an evaluation is one
-    einsum. The gradient is closed-form:
+    Everything that does not depend on the parameters is computed once: the
+    recursion R, the time in each (block, state) cell, and the compensator
+    kernel sum S_lij = sum_{k: e_k = j} (1 - exp(-beta_lij (T - t_k))). What
+    remains is
 
-        dLL/dmu_bsi    = sum_{k in cell (b, s), m_k = i} 1 / lambda_i(t_k)  -  time in cell (b, s)
-        dLL/dalpha_lij = sum_{k: m_k = i} R_lij[k] / lambda_i(t_k)           -  S_lij / beta_lij
+        LL = sum_k log lambda_{m_k}(t_k)  -  sum mu * time_in  -  sum (alpha / beta) * S
 
-    which turns 60+ likelihood evaluations per L-BFGS step into one.
+    which torch differentiates. Returns (nll, grad) as scipy wants them.
     """
     L, K, J = beta.shape
     B = len(edges) - 1
-    R = excitation(ev.t, ev.e, beta)
-    cell = block_of(edges, ev.t) * S + (ev.s if S > 1 else 0)
-    tin = time_in(edges, ev, 0.0, T, S).ravel()
-    idx = np.arange(len(ev))
     Skern = np.zeros((L, K, J))
     for j in range(J):
         tail = (T - ev.t[ev.e == j])[:, None]
         for l in range(L):
             Skern[l, :, j] = (1.0 - np.exp(-beta[l, :, j][None, :] * tail)).sum(0)
-    by_type = [ev.m == i for i in range(K)]
-    inside = ev.t < T  # same half-open [0, T) window as `loglik`
+
+    R = torch.from_numpy(excitation(ev.t, ev.e, beta))
+    cell = torch.from_numpy(block_of(edges, ev.t) * S + (ev.s if S > 1 else 0))
+    tin = torch.from_numpy(time_in(edges, ev, 0.0, T, S).ravel())
+    inside = torch.from_numpy(ev.t < T)  # same half-open [0, T) window as `loglik`
+    own_idx = (torch.arange(len(ev)), torch.from_numpy(ev.m))
+    kern = torch.from_numpy(Skern / beta)
 
     def objective(theta: np.ndarray) -> tuple[float, np.ndarray]:
-        x = np.exp(theta)
+        th = torch.from_numpy(theta).requires_grad_(True)
+        x = th.exp()
         mu, alpha = x[:B * S * K].reshape(B * S, K), x[B * S * K:].reshape(L, K, J)
-        lam = mu[cell] + np.einsum("lij,nlij->ni", alpha, R)
-        own = lam[idx, ev.m]
-        ll = np.log(own[inside]).sum() - (mu * tin[:, None]).sum() - (alpha / beta * Skern).sum()
-        inv = np.where(inside, 1.0 / own, 0.0)
-        g_mu = np.repeat(-tin[:, None], K, axis=1)
-        np.add.at(g_mu, (cell, ev.m), inv)
-        g_alpha = -Skern / beta
-        for i, ki in enumerate(by_type):
-            g_alpha[:, i, :] += np.einsum("nlj,n->lj", R[ki, :, i, :], inv[ki])
-        return -ll, -np.concatenate([g_mu.ravel(), g_alpha.ravel()]) * x
+        lam = mu[cell] + torch.einsum("lij,nlij->ni", alpha, R)
+        ll = lam[own_idx][inside].log().sum() - (mu * tin[:, None]).sum() - (alpha * kern).sum()
+        nll = -ll
+        nll.backward()
+        return nll.item(), th.grad.numpy().copy()
 
     return objective
 
@@ -86,6 +88,7 @@ def fit_hawkes(
     """
     K, J = ev.K, ev.J
     S = ev.S if state_baseline else 1
+    edges = np.asarray(edges, float)
     B = len(edges) - 1
     fixed = scales is not None
     L = len(scales) if fixed else 1

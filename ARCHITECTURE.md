@@ -116,7 +116,7 @@ src/microflux/
 ├── book.py         snapshot + diffs → 1 Hz book state
 ├── events.py       Events: (t, excited type, state, exciting type) + state as a step function of time
 ├── hawkes.py       Params, kernel recursion, intensity, compensator, log-likelihood
-├── mle.py          fit_poisson, fit_hawkes (analytic gradient when β fixed), extrapolate
+├── mle.py          fit_poisson, fit_hawkes (torch autograd objective when β fixed, scipy L-BFGS-B), extrapolate
 ├── residuals.py    time-rescaling residuals, KS distance
 ├── simulate.py     Ogata thinning — synthetic truth for the tests
 └── experiment.py   shared loader, split, timescale grid, evaluator, cache
@@ -454,6 +454,16 @@ BUY<-BUY        ask-heavy  balanced  bid-heavy      SELL<-SELL     ask-heavy  ba
 **Fast same-side excitation (5 ms) is strongest when the book is stacked on the aggressor's side** — a buy into a bid-heavy book roughly doubles its immediate follow-on. **Slow same-side excitation (5–50 s) is strongest when the book is stacked against the aggressor** — a buy into an ask-heavy book spawns three times the follow-on over seconds. The two effects have opposite signs and partially cancel in the total, which is why D6's totals were ambiguous. The reading: fast follow-on is momentum into thin liquidity; slow follow-on is patient execution against resistance — a metaorder working through a book that is fighting it.
 
 **Consequences.** (1) Any state-dependence claim must be made per timescale; totals hide sign flips. (2) The exogenous-rate dependence on imbalance (the classic queue-imbalance result) is reproduced and is separate from the propagation effect. (3) One 8-hour session; none of this is replicated. (4) KS is unmoved (0.147 / 0.128): the state is not what the model is missing. Marks and millisecond quantisation remain the candidates.
+
+---
+
+### D8 — PyTorch for the objective; numpy/numba for everything else (2026-09-12)
+
+**Decision.** The fixed-β objective in `mle.fixed_objective` is torch: the recursion R, cell times and compensator kernel sums are precomputed once (numba/numpy), and the log-likelihood on top of them is a few tensor operations that autograd differentiates. scipy L-BFGS-B stays as the optimiser, fed the torch value and gradient. Data, book replay, the recursion, residuals and all evaluation stay numpy. Free-β keeps numerical gradients. float64 throughout so torch, numpy and scipy agree exactly.
+
+**Reason.** Marks make the intensity bilinear in `(α, κ)` and every extension after them — neural TPP, generative — needs autograd. Hand-written gradients were the right call while the likelihood was concave and linear in its parameters; they stop being the right call at the next step. Verified: torch NLL equals the numpy reference to 1e-9 (`test_torch_objective_matches_numpy_loglik_and_finite_differences`), every recovery test lands where it did, and the Stage 3 ladder reproduces to four decimals.
+
+**Consequences.** Fits are ~5× faster (heaviest 78 s → 15 s; torch einsum backward beats a numpy `add.at` loop). `torch` (~200 MB, CPU build) is a hard dependency. CPU is sufficient at this scale — 147k events × 5 scales × 12 exciting types is 9M floats.
 
 ---
 
