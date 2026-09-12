@@ -41,13 +41,26 @@ def load_book(root: str, symbol: str, date: str) -> pl.DataFrame:
     return book
 
 
-def state_function(book: pl.DataFrame, t0_ns: int, column: str, cuts: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """The book as a step function of time: (step_t, step_s), with `column`
-    bucketed by `cuts`. Book rows carry emission time; an order matched at
-    T sees the row emitted at or before T, which cannot include that order
-    -- leak-free, and up to one second stale."""
-    step_t = (book["timestamp_ns"].to_numpy() - t0_ns) / 1e9
-    return step_t, np.digitize(book[column].to_numpy(), cuts)
+def imbalance_state(orders: pl.DataFrame, book: pl.DataFrame, T_train: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """L5-imbalance terciles as a step function of time: (step_t, step_s, cuts).
+
+    Cuts come from train book rows only (1 Hz, so time-weighted). Book rows
+    carry emission time; an order matched at T sees the row emitted at or
+    before T, which cannot include that order -- leak-free, and up to one
+    second stale.
+    """
+    step_t = (book["timestamp_ns"].to_numpy() - orders["timestamp_ns"][0]) / 1e9
+    imb = book["imb5"].to_numpy()
+    cuts = np.percentile(imb[step_t < T_train], [100 / 3, 200 / 3])
+    return step_t, np.digitize(imb, cuts), cuts
+
+
+MARK_EDGES = np.array([2, 5, 20])  # fill-count classes: 1 / 2-4 / 5-19 / 20+
+MARK_NAMES = ("1 fill", "2-4", "5-19", "20+")
+
+
+def mark_class(orders: pl.DataFrame) -> np.ndarray:
+    return np.digitize(orders["fills"].to_numpy(), MARK_EDGES)
 
 
 def splits(T: float) -> dict[str, tuple[float, float]]:

@@ -51,6 +51,17 @@ STATE = Params(
     edges=ONE,
 )
 
+# Marks. No state; two mark classes drawn iid (70% small, 30% big). A big
+# order excites three times as much as a small one, on both sides. Exciting
+# types are (side, mark): columns BUY@small, SELL@small, BUY@big, SELL@big.
+MARK = Params(
+    mu=np.array([[[0.5, 0.5]]]),
+    alpha=np.array([[[2.0, 0.5, 6.0, 1.5], [0.5, 2.0, 1.5, 6.0]]]),
+    beta=np.full((1, 2, 4), 20.0),
+    edges=ONE,
+)
+MARK_PROB = np.array([0.7, 0.3])
+
 
 @pytest.fixture(scope="module")
 def single():
@@ -72,6 +83,14 @@ def stated():
     ev = simulate(STATE, T=20_000.0, seed=3, step_t=st, step_s=ss)
     assert 10_000 < len(ev) < 60_000
     assert ev.S == 2 and ev.J == 4
+    return ev
+
+
+@pytest.fixture(scope="module")
+def marked():
+    ev = simulate(MARK, T=20_000.0, seed=4, mark_prob=MARK_PROB)
+    assert 10_000 < len(ev) < 60_000
+    assert ev.C == 2 and ev.J == 4
     return ev
 
 
@@ -98,6 +117,17 @@ def test_fit_separates_state_rate_from_state_kernel(stated):
     np.testing.assert_allclose(got.branching, STATE.branching, rtol=0.25)
     ratio = got.branching[0, 2] / got.branching[0, 0]  # BUY<-BUY@1 over BUY<-BUY@0
     assert 2.2 < ratio < 3.8
+
+
+def test_mark_dependent_excitation_recovers_truth(marked):
+    """A big order must be seen to excite three times what a small one does,
+    and the mark of the exciting order -- not the excited one -- must be what
+    the kernel keys on."""
+    got = fit_hawkes(marked, T=marked.t[-1], scales=np.array([20.0]))
+    np.testing.assert_allclose(got.branching, MARK.branching, rtol=0.25)
+    for i in range(2):  # BUY<-BUY@big / BUY<-BUY@small, then SELL
+        ratio = got.branching[i, i + 2] / got.branching[i, i]
+        assert 2.2 < ratio < 3.8
 
 
 def test_state_free_fit_blends_the_states(stated):

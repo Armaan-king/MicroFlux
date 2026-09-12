@@ -25,7 +25,7 @@ import numpy as np
 
 from microflux.events import events
 from microflux.experiment import (
-    HALF_LIVES, SCALES, TYPES, evaluate, load_book, load_orders, splits, state_function,
+    HALF_LIVES, SCALES, TYPES, evaluate, imbalance_state, load_book, load_orders, splits,
 )
 from microflux.hawkes import block_edges
 from microflux.mle import extrapolate, fit_hawkes, fit_poisson
@@ -50,10 +50,7 @@ def main() -> None:
     T_train = split["train"][1]
     blocks = block_edges(T_train, args.block_minutes * 60)
 
-    t0 = orders["timestamp_ns"][0]
-    book_t = (book["timestamp_ns"].to_numpy() - t0) / 1e9
-    cuts = np.percentile(book["imb5"].to_numpy()[book_t < T_train], [100 / 3, 200 / 3])
-    step_t, step_s = state_function(book, t0, "imb5", cuts)
+    step_t, step_s, cuts = imbalance_state(orders, book, T_train)
     shifted = np.roll(step_s, int(args.shift_hours * 3600))  # book rows are 1 Hz
 
     def seq(kernel_state: bool, states=step_s):

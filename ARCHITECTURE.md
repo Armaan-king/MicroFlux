@@ -123,7 +123,8 @@ src/microflux/
 
 explore.py          Stage 1 measurements
 fit.py              Stage 2 six-model ladder
-fit_state.py        Stage 3 state-dependent excitation, with permutation control
+fit_state.py        Stage 3 state-dependent excitation, with time-shift control
+fit_marks.py        Stage 3b marked excitation by fill count, with shuffle control
 tests/              recovery-from-known-truth tests
 data/               replayed book cache (gitignored)
 ```
@@ -464,6 +465,40 @@ BUY<-BUY        ask-heavy  balanced  bid-heavy      SELL<-SELL     ask-heavy  ba
 **Reason.** Marks make the intensity bilinear in `(α, κ)` and every extension after them — neural TPP, generative — needs autograd. Hand-written gradients were the right call while the likelihood was concave and linear in its parameters; they stop being the right call at the next step. Verified: torch NLL equals the numpy reference to 1e-9 (`test_torch_objective_matches_numpy_loglik_and_finite_differences`), every recovery test lands where it did, and the Stage 3 ladder reproduces to four decimals.
 
 **Consequences.** Fits are ~5× faster (heaviest 78 s → 15 s; torch einsum backward beats a numpy `add.at` loop). `torch` (~200 MB, CPU build) is a hard dependency. CPU is sufficient at this scale — 147k events × 5 scales × 12 exciting types is 9M floats.
+
+---
+
+### D9 — Marks: the multi-scale kernel was two populations (2026-09-12)
+
+**Decision.** The fill count of an aggressive order (levels swept) is its mark, in classes 1 / 2–4 / 5–19 / 20+ (46 / 15 / 19 / 20% of orders). The mark class of the *exciting* order widens its exciting type, exactly as state does — non-parametric, still concave, and the shape of the effect is read off rather than assumed. `Events` carries `c` and `C`; `e = m + K (s + S c)`. The likelihood is for times and sides given marks; a mark density that is iid given side would not depend on the kernel and cannot change the fit.
+
+**Held-out gain over `Hawkes x5 + μ(t)`, test NLL/event:**
+
+```
+marks in kernel                    +0.1545      KS 0.147 / 0.143  →  0.055 / 0.061
+marks, shuffled                    +0.0002
+state (D7)                         +0.0197
+state and marks                    +0.1593
+```
+
+Marks are **8× more informative than state**, the shuffled control is zero, and KS drops by two-thirds — the marks were what the model was missing. Given marks, state adds only +0.005 of its solo +0.020: three-quarters of what imbalance "knew" was correlated with sweep depth.
+
+**Result — two populations, not one multi-scale kernel.** `BUY←BUY` branching by mark of the exciting order:
+
+```
+ half-life    1 fill     2-4    5-19     20+
+    5 ms       0.078   0.385   0.510   0.876
+   50 ms       0.000   0.000   0.164   0.138
+  500 ms       0.356   0.441   0.022   0.048
+    5 s        0.157   0.210   0.000   0.000
+   50 s        0.054   0.001   0.000   0.000
+```
+
+**Deep sweeps (5+ fills) excite only at 5–50 ms** and nothing after; **small orders (1–4 fills) excite only at 0.5–50 s** and almost nothing before. D5's "self-excitation at every decade" was these two superimposed: a fast reaction to visible sweeps (momentum, latency response) and a slow train of small orders (a metaorder being worked). The unmarked kernel averaged them. D7's state effect at 5 ms is confined to small orders (1-fill `BUY←BUY` 0.03 / 0.07 / 0.13 across ask-heavy / balanced / bid-heavy); for 20+ sweeps it is flat (0.94 / 0.89 / 0.86).
+
+**Artifact check.** A sweep crossing a millisecond boundary would be split by `collapse_trades` into two orders 1 ms apart and masquerade as fast excitation. Measured: after a 20+ order, a same-side order follows at exactly +1 ms 21% of the time and at +2 ms 18% — a smooth decay, not a spike — and the +1 ms / (+2..5 ms) ratio is *lowest* for the 20+ class (2.65 vs 3.36 for single fills). Not splitting.
+
+**Consequences.** (1) Every propagation claim must condition on mark; unmarked kernels mix two mechanisms. (2) The working model is `Hawkes x5 + μ(t,s) + k(s,c)`: 378 parameters, J = 24, 81 s to fit, test NLL −0.256, KS 0.055 / 0.059. (3) Quantity (BTC) is a second candidate mark, correlated 0.53 with fills. (4) Still one session.
 
 ---
 

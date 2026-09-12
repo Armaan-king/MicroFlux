@@ -26,15 +26,18 @@ def random_states(T: float, S: int, mean_dwell: float, seed: int = 0) -> tuple[n
 def simulate(
     p: Params, T: float, seed: int = 0,
     step_t: np.ndarray | None = None, step_s: np.ndarray | None = None,
+    mark_prob: np.ndarray | None = None,
 ) -> Events:
-    """Events on [0, T] under `p`, with the baseline and the exciting type both
-    following the given state function (state 0 throughout if none)."""
+    """Events on [0, T] under `p`. The baseline and the exciting type follow
+    the given state function (state 0 throughout if none); each event draws
+    an iid mark class from `mark_prob` (class 0 if none)."""
     rng = np.random.default_rng(seed)
     K, S = p.K, p.S
+    C = 1 if mark_prob is None else len(mark_prob)
     stub = events(np.empty(0), np.empty(0, np.int64), K, step_t, step_s, S)
     R = np.zeros_like(p.alpha)
     mu_max = p.mu.max((0, 1))
-    t, times, types = 0.0, [], []
+    t, times, types, marks = 0.0, [], [], []
     while True:
         bound = (mu_max + (p.alpha * R).sum((0, 2))).sum()  # intensity only decays until the next event
         dt = rng.exponential(1.0 / bound)
@@ -47,7 +50,10 @@ def simulate(
         lam = p.mu[block_of(p.edges, here)[0], s] + (p.alpha * R).sum((0, 2))
         if rng.uniform() * bound < lam.sum():
             j = rng.choice(K, p=lam / lam.sum())
+            c = 0 if mark_prob is None else rng.choice(C, p=mark_prob)
             times.append(t)
             types.append(j)
-            R[:, :, j + K * s] += 1.0
-    return events(np.array(times), np.array(types, dtype=np.int64), K, stub.step_t, stub.step_s, S)
+            marks.append(c)
+            R[:, :, j + K * (s + S * c)] += 1.0
+    return events(np.array(times), np.array(types, dtype=np.int64), K, stub.step_t, stub.step_s, S,
+                  mark=np.array(marks, dtype=np.int64), C=C)
