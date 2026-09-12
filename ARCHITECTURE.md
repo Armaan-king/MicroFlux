@@ -106,35 +106,29 @@ The representation between these stages is intentionally not fixed yet.
 
 ---
 
-# Initial Repository Structure
+# Repository Structure
 
-Create only the broad architectural directories:
+Flat modules, one job each. Files appear when they have a purpose; the six planned subdirectories (`tickforge/ data/ models/ training/ evaluation/ analysis/`) are unused until a second module of the same kind exists.
 
 ```text
-microflux/
-│
-├── src/
-│   └── microflux/
-│       ├── tickforge/
-│       ├── data/
-│       ├── models/
-│       ├── training/
-│       ├── evaluation/
-│       └── analysis/
-│
-├── configs/
-├── tests/
-├── notebooks/
-└── docs/
+src/microflux/
+├── load.py         TickForge partitions → frames; continuity check; fill → order collapse
+├── book.py         snapshot + diffs → 1 Hz book state; order ↔ book alignment
+├── events.py       Events: the (t, excited type, exciting type) contract
+├── hawkes.py       Params, kernel recursion, intensity, compensator, log-likelihood
+├── mle.py          fit_poisson, fit_hawkes (analytic gradient when β fixed), extrapolate
+├── residuals.py    time-rescaling residuals, KS distance
+├── simulate.py     Ogata thinning — synthetic truth for the tests
+└── experiment.py   shared loader, split, timescale grid, evaluator, cache
+
+explore.py          Stage 1 measurements
+fit.py              Stage 2 six-model ladder
+fit_state.py        Stage 3 state-dependent excitation, with permutation control
+tests/              recovery-from-known-truth tests
+data/               replayed book cache (gitignored)
 ```
 
-**Keep these folders empty initially.**
-
-Do not create placeholder Python modules, model files, interfaces, or abstractions simply to fill the structure.
-
-Files should be introduced only when their purpose and design have been discussed and decided.
-
-The directory structure itself may also change as the project evolves.
+Do not create placeholder modules, interfaces, or abstractions to fill structure. The structure may change as the project evolves.
 
 ---
 

@@ -25,7 +25,8 @@ import numpy as np
 from microflux.experiment import (
     HALF_LIVES, SCALES, TYPES, evaluate, load_book, load_orders, splits, with_book,
 )
-from microflux.hawkes import events, extrapolate, fit_hawkes
+from microflux.events import events
+from microflux.mle import extrapolate, fit_hawkes
 
 STATES = ("ask-heavy", "balanced", "bid-heavy")
 

@@ -8,7 +8,9 @@ import numpy as np
 import polars as pl
 
 from microflux.book import align, replay
-from microflux.hawkes import Events, Params, ks_exp1, loglik, rescaled_residuals
+from microflux.events import Events
+from microflux.hawkes import Params, loglik
+from microflux.residuals import ks_exp1, rescaled_residuals
 from microflux.load import collapse_trades, load_stream, partition
 
 TYPES = ("BUY", "SELL")

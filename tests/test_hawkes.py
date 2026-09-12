@@ -15,10 +15,11 @@ import numpy as np
 import pytest
 from scipy.optimize import check_grad
 
-from microflux.hawkes import (
-    Params, _fixed_objective, block_edges, extrapolate, fit_hawkes, fit_poisson,
-    ks_exp1, loglik, rescaled_residuals, simulate,
-)
+from microflux.events import events
+from microflux.hawkes import Params, block_edges, loglik
+from microflux.mle import extrapolate, fit_hawkes, fit_poisson, fixed_objective
+from microflux.residuals import ks_exp1, rescaled_residuals
+from microflux.simulate import simulate
 
 SINGLE = Params(
     mu=np.array([[0.5, 0.3]]),
@@ -98,8 +99,6 @@ def test_state_dependent_excitation_recovers_truth(stated):
 def test_state_free_fit_on_state_data_averages_the_states(stated):
     """Collapsing the state should give roughly the frequency-weighted mean of
     the two per-state kernels -- the number the state model must beat."""
-    from microflux.hawkes import events
-
     flat = events(stated.t, stated.m, stated.K)
     got = fit_hawkes(flat, T=flat.t[-1], scales=np.array([20.0]))
     expected = STATE.branching[0, 0] * STATE_PROB[0] + STATE.branching[0, 2] * STATE_PROB[1]
@@ -138,7 +137,7 @@ def test_analytic_gradient_matches_finite_differences(stated):
     the state model so the K != J indexing is exercised."""
     T = stated.t[-1]
     edges = block_edges(T, 10_000.0)
-    obj = _fixed_objective(stated, T, edges, STATE.beta)
+    obj = fixed_objective(stated, T, edges, STATE.beta)
     theta = np.log(np.concatenate([np.full(4, 0.4), np.full(8, 1.0)]))
 
     value, _ = obj(theta)

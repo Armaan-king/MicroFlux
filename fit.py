@@ -20,7 +20,9 @@ import argparse
 import time
 
 from microflux.experiment import HALF_LIVES, SCALES, TYPES, evaluate, load_orders, matrix, splits
-from microflux.hawkes import Params, events, extrapolate, fit_hawkes, fit_poisson
+from microflux.events import events
+from microflux.hawkes import Params
+from microflux.mle import extrapolate, fit_hawkes, fit_poisson
 
 
 def main() -> None:
