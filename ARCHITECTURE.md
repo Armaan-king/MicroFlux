@@ -410,7 +410,19 @@ Decisions made from measurement. Each records what was decided, why, and what it
 
 **Result on 2026-09-09.** Test NLL/event: Poisson 0.999 → Hawkes 0.006. Self-excitation is fast and strong (branching 0.44 / 0.46, half-life ≈ 6 ms). Cross-excitation is slow (half-life ≈ 21 s). Spectral radius 0.67. KS on test 0.15 for both types — Hawkes fits much better than Poisson and still does not fit.
 
-**Open.** The 21 s cross-kernels coincide with a measured activity drift (6.0 → 3.2 orders/s across the capture) and may be absorbing non-stationarity rather than excitation. Two-timescale structure (ms and tens of seconds) is what a single exponential cannot represent. Next: time-varying baseline μ(t) as the non-stationarity control, then sum-of-exponentials kernels.
+**Open.** The 21 s cross-kernels coincide with a measured activity drift (6.0 → 3.2 orders/s across the capture) and may be absorbing non-stationarity rather than excitation. Two-timescale structure (ms and tens of seconds) is what a single exponential cannot represent. Next: time-varying baseline μ(t) as the non-stationarity control, then sum-of-exponentials kernels. → Resolved in D5.
+
+### D5 — Cross-excitation was drift; self-excitation is multi-scale (2026-09-12)
+
+**Decision.** The working order-flow model is `Hawkes x5 + μ(t)`: five fixed exponential scales per pair (half-lives 5 ms, 50 ms, 0.5 s, 5 s, 50 s), weights fit by MLE with analytic gradients, baseline piecewise-constant per 15 min. Held-out evaluation freezes μ at its train mean (`hawkes.extrapolate`).
+
+**Reason — A, the drift control.** Letting μ(t) vary (it spans 1.02–3.54 /s across train) collapses the 21 s `SELL←BUY` kernel from branching 0.160 to **0.007**. The slow cross-excitation reported by the single-exponential model was non-stationarity wearing a kernel. The free-β model is also non-convex: two runs differing only in initialisation landed in different optima (train NLL −1.156 vs −1.148), one with the slow kernel on `BUY←SELL`, the other on `SELL←BUY`. With β fixed the likelihood is concave and this cannot happen.
+
+**Reason — B, the timescales.** Self-excitation is real at every decade: `BUY←BUY` branching 0.37 (5 ms), 0.08 (50 ms), 0.21 (0.5 s), 0.09 (5 s), 0.03 (50 s), total 0.77; `SELL←SELL` totals 0.71 with the same shape. Cross-excitation totals 0.04–0.07 and lives only at 5–50 s. Spectral radius 0.80: four in five orders are triggered by earlier orders.
+
+**Held-out (test NLL/event).** Poisson 0.999 → Hawkes 0.045 → Hawkes x5 −0.099. KS(Exp1) on test: 0.20/0.24 → 0.17/0.15 → 0.15/0.14. Each rung helps; none fits. Note the free-β `Hawkes + μ(t)` forecasts *worse* than `Hawkes` (0.076 vs 0.045): the spurious 21 s kernel was a crude rate tracker, and a train-mean baseline is not. A misspecified model can out-forecast a controlled one — the control is for interpretation, not prediction.
+
+**Consequences.** (1) Any claim about cross-side propagation must be made with a drifting baseline or it is not a claim about excitation. (2) The dominant structure is same-side, millisecond-scale, and near-critical — Stage 3 state-dependence can modulate the ≥ 0.5 s scales and the baseline but cannot reach the 5 ms burst with 1 Hz book state. (3) Remaining misfit candidates, in order: millisecond timestamp quantisation against a 5 ms kernel, unmodelled marks (fill count / size), and intraday seasonality inside 15-min blocks.
 
 ---
 
