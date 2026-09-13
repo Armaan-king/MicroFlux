@@ -9,7 +9,7 @@ venv/
 # research data: raw TickForge cache and derived datasets are reproducible
 data/
 cache/
-runs/
+runs/**/*.pt
 *.parquet
 
 # experiment outputs
@@ -18,3 +18,4 @@ checkpoints/
 wandb/
 mlruns/
 .venv/
+runs/**/*.pt

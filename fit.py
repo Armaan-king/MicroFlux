@@ -9,9 +9,11 @@ Six models, each adding one thing, so every improvement has one cause:
     Hawkes x5                     five fixed timescales per pair
     Hawkes x5 + mu(t)             both controls                                 (B)
 
-Fits on train only. Reports per-event NLL on train/val/test and the
-time-rescaling KS distance on test -- likelihood ranks the models, KS says
-whether any of them actually fits.
+Fits on train only. Reports per-event NLL on train and validation and the
+time-rescaling KS distance on validation -- likelihood ranks the models, KS
+says whether any of them actually fits. The test segment is not touched;
+D4/D5 quoted test numbers from before the protocol froze and are
+exploratory.
 
     python fit.py [--root C:/tickforge-runs] [--date 2026-09-09] [--minutes N] [--block-minutes 15]
 """

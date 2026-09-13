@@ -33,6 +33,7 @@ import torch
 from torch import nn
 
 from microflux.events import Events
+from microflux.runs import Run
 
 DTYPE = torch.float32  # the classical likelihood is float64; 1e-7 per event here is far below what is read
 EPS = 5e-4  # half a millisecond tick, inside every log
@@ -62,10 +63,15 @@ class Features:
         return len(self.t)
 
 
-def _trailing_counts(t: np.ndarray, mask: np.ndarray, at: np.ndarray, window: float) -> np.ndarray:
-    """Number of masked events in (at - window, at]."""
-    tm = t[mask]
-    return np.searchsorted(tm, at, side="right") - np.searchsorted(tm, at - window, side="left")
+def _trailing_counts(t: np.ndarray, mask: np.ndarray, window: float) -> np.ndarray:
+    """For each event k: masked events at index <= k with time > t_k - window.
+
+    Counted by capture index, not by time, so an event later in capture order
+    that shares the timestamp is not seen -- it has not happened yet.
+    """
+    cum = np.concatenate([[0], np.cumsum(mask)])          # cum[k + 1] = masked events with index <= k
+    lo = np.searchsorted(t, t - window, side="right")     # first index with time > t_k - window
+    return cum[np.arange(len(t)) + 1] - cum[lo]
 
 
 def features(ev: Events, T_end: float) -> Features:
@@ -77,10 +83,10 @@ def features(ev: Events, T_end: float) -> Features:
     cols = []
     for w in SUMMARY_WINDOWS:
         for i in range(ev.K):
-            cols.append(_trailing_counts(t, ev.m == i, t, w))
+            cols.append(_trailing_counts(t, ev.m == i, w))
     for w in BIG_WINDOWS:
         for i in range(ev.K):
-            cols.append(_trailing_counts(t, (ev.m == i) & (ev.c == ev.C - 1), t, w))
+            cols.append(_trailing_counts(t, (ev.m == i) & (ev.c == ev.C - 1), w))
     summary = np.log1p(np.column_stack(cols).astype(float))
 
     # pieces: interval k is (t_{k-1}, t_k], split at book rows strictly inside;
@@ -201,13 +207,20 @@ def _batch(f: Features, anchors: np.ndarray, N: int) -> dict:
             "summary": torch.as_tensor(f.summary[anchors], dtype=DTYPE), "last": torch.as_tensor(last, dtype=DTYPE)}
 
 
-def _pieces_in(f: Features, a: float, b: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Compensator pieces clipped to [a, b): (closing event k, tau0, tau1, state)."""
+def _pieces_in(f: Features, a: float, b: float, cuts: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Compensator pieces clipped to [a, b) and split at `cuts`:
+    (closing event k, tau0, tau1, state). A piece never straddles a cut, so
+    assigning it to the block its start falls in is exact."""
     u0, u1 = np.maximum(f.piece_u0, a), np.minimum(f.piece_u1, b)
     keep = u1 > u0
-    k = f.piece_k[keep]
+    k, u0, u1, st = f.piece_k[keep], u0[keep], u1[keep], f.piece_state[keep]
+    for c in (np.asarray(cuts, float) if cuts is not None else ()):
+        hit = (u0 < c) & (c < u1)
+        if hit.any():
+            k = np.concatenate([k, k[hit]]); st = np.concatenate([st, st[hit]])
+            u0, u1 = np.concatenate([u0, np.full(hit.sum(), c)]), np.concatenate([np.where(hit, c, u1), u1[hit]])
     anchor_t = f.t[k - 1]
-    return k, u0[keep] - anchor_t, u1[keep] - anchor_t, f.piece_state[keep]
+    return k, u0 - anchor_t, u1 - anchor_t, st
 
 
 @dataclass(frozen=True)
@@ -220,9 +233,10 @@ class Parts:
     comp_k: np.ndarray   # (P,)      the event closing each piece's interval
 
 
-def loglik_parts(model: TPP, f: Features, a: float, b: float, N: int, batch_size: int = 2048) -> Parts:
+def loglik_parts(model: TPP, f: Features, a: float, b: float, N: int, batch_size: int = 2048,
+                 cuts: np.ndarray | None = None) -> Parts:
     """Point log-intensities of the events in [a, b), and the compensator
-    integral of every piece clipped to [a, b)."""
+    integral of every piece clipped to [a, b) and split at `cuts`."""
     model.eval()
     with torch.no_grad():
         ks = np.flatnonzero((f.t >= a) & (f.t < b) & (np.arange(len(f)) > 0))
@@ -234,7 +248,7 @@ def loglik_parts(model: TPP, f: Features, a: float, b: float, N: int, batch_size
             tau = torch.as_tensor(f.t[kk] - f.t[kk - 1], dtype=DTYPE)
             lam = model.head.intensity(a_, b_, tau)
             point[s:s + batch_size] = torch.log(lam[torch.arange(len(kk)), torch.from_numpy(f.side[kk])]).double().numpy()
-        pk, tau0, tau1, pst = _pieces_in(f, a, b)
+        pk, tau0, tau1, pst = _pieces_in(f, a, b, cuts)
         comp = np.empty((len(pk), model.head.K))
         for s in range(0, len(pk), batch_size):
             kk = pk[s:s + batch_size]
@@ -252,9 +266,11 @@ def loglik(model: TPP, f: Features, a: float, b: float, N: int) -> float:
 
 
 def block_loglik(model: TPP, f: Features, a: float, b: float, N: int, block_s: float) -> tuple[np.ndarray, np.ndarray]:
-    """Per-block log-likelihood and event count on [a, b), same blocks as `experiment.block_loglik`."""
-    q = loglik_parts(model, f, a, b, N)
+    """Per-block log-likelihood and event count on [a, b), same blocks as
+    `experiment.block_loglik`. Pieces are split at the block edges first, so
+    each block gets exactly its own share of every straddling piece."""
     edges = np.append(np.arange(a, b, block_s), b)
+    q = loglik_parts(model, f, a, b, N, cuts=edges[1:-1])
     bp = np.clip(np.searchsorted(edges, q.point_t, side="right") - 1, 0, len(edges) - 2)
     bc = np.clip(np.searchsorted(edges, q.comp_t, side="right") - 1, 0, len(edges) - 2)
     ll = (np.bincount(bp, weights=q.point, minlength=len(edges) - 1)
@@ -282,61 +298,114 @@ def rescaled_residuals(model: TPP, f: Features, a: float, b: float, N: int) -> l
 # --- training -----------------------------------------------------------------
 
 
-def train(model: TPP, f: Features, T_train: float, val: tuple[float, float], N: int,
-          epochs: int = 30, batch_size: int = 512, lr: float = 1e-3, patience: int = 3, seed: int = 0,
-          targets_per_epoch: int | None = None, log=print) -> dict:
-    """Adam on the training window, early stopping on validation NLL/event.
-    The training objective is the per-interval likelihood: for each event k
-    in train, log lambda_{m_k}(t_k) minus the integral over its interval
-    (t_{k-1}, t_k], piece by piece across book rows. `targets_per_epoch`
-    draws that many training events per epoch without replacement, so the
-    validation check comes round more often."""
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    ks = np.flatnonzero((f.t < T_train) & (np.arange(len(f)) > 0))
-    # pieces of the training intervals, grouped by closing event
+def _training_units(f: Features, T_train: float):
+    """The training window as units: one per event k in (0, T_train) with a
+    point term and the pieces of (t_{k-1}, t_k], plus one unit for the
+    clipped tail (t_last, T_train) with pieces only. Their sum is the
+    likelihood on [0, T_train) minus the point term of event 0, which has
+    no history and is excluded from every neural window."""
     pk, tau0, tau1, pst = _pieces_in(f, 0.0, T_train)
     order = np.argsort(pk, kind="stable")
     pk, tau0, tau1, pst = pk[order], tau0[order], tau1[order], pst[order]
-    first = np.searchsorted(pk, ks, side="left")
-    last = np.searchsorted(pk, ks, side="right")
+    units = np.unique(np.concatenate([np.flatnonzero((f.t < T_train) & (np.arange(len(f)) > 0)), pk]))
+    has_point = (units < len(f)) & (f.t[np.minimum(units, len(f) - 1)] < T_train)
+    first = np.searchsorted(pk, units, side="left")
+    last = np.searchsorted(pk, units, side="right")
+    return units, has_point, first, last, tau0, tau1, pst
+
+
+def _unit_loglik(model: TPP, f: Features, N: int, units, has_point, first, last, tau0, tau1, pst, sel) -> torch.Tensor:
+    """Sum of (point term - compensator) over the selected units."""
+    kk = units[sel]
+    h = model.encoder(_batch(f, kk - 1, N))
+    total = torch.zeros((), dtype=DTYPE)
+    hp = has_point[sel]
+    if hp.any():
+        kp = kk[hp]
+        a_, b_ = model.head(h[torch.from_numpy(hp)], torch.from_numpy(f.state[kp]))
+        lam = model.head.intensity(a_, b_, torch.as_tensor(f.t[kp] - f.t[kp - 1], dtype=DTYPE))
+        total = total + torch.log(lam[torch.arange(len(kp)), torch.from_numpy(f.side[kp])]).sum()
+    counts = last[sel] - first[sel]
+    if counts.sum() > 0:
+        pieces = np.concatenate([np.arange(first[i], last[i]) for i in sel])
+        owner = np.repeat(np.arange(len(kk)), counts)
+        a_p, b_p = model.head(h[torch.from_numpy(owner)], torch.from_numpy(pst[pieces]))
+        total = total - model.head.integral(a_p, b_p, torch.as_tensor(tau0[pieces], dtype=DTYPE),
+                                            torch.as_tensor(tau1[pieces], dtype=DTYPE)).sum()
+    return total
+
+
+def training_objective(model: TPP, f: Features, T_train: float, N: int, batch_size: int = 4096) -> float:
+    """The full training-window log-likelihood as the optimiser sees it.
+    Must equal `loglik(model, f, 0, T_train, N)`; a test holds it to that."""
+    units, has_point, first, last, tau0, tau1, pst = _training_units(f, T_train)
+    model.eval()
+    total = 0.0
+    with torch.no_grad():
+        for s in range(0, len(units), batch_size):
+            sel = np.arange(s, min(s + batch_size, len(units)))
+            total += _unit_loglik(model, f, N, units, has_point, first, last, tau0, tau1, pst, sel).item()
+    return total
+
+
+def train(model: TPP, f: Features, T_train: float, val: tuple[float, float], N: int,
+          max_epochs: int = 40, min_epochs: int = 10, batch_size: int = 512, lr: float = 1e-3,
+          patience: int = 8, seed: int = 0, targets_per_epoch: int | None = None,
+          run: Run | None = None, log=print) -> dict:
+    """Adam on the training window, early stopping on validation NLL/event.
+
+    The objective is the whole training window: for each event k in
+    (0, T_train), log lambda_{m_k}(t_k) minus the integral over (t_{k-1}, t_k]
+    piece by piece across book rows, plus the clipped tail (t_last, T_train)
+    (`training_objective` checks the sum against `loglik`). `targets_per_epoch`
+    draws that many units per epoch without replacement.
+
+    Stopping: never before `min_epochs`, never after `max_epochs`, otherwise
+    after `patience` epochs without a validation improvement of 1e-4. With a
+    `run`, every epoch writes the learning curve and a resumable checkpoint;
+    an existing checkpoint in that directory is resumed.
+    """
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    units, has_point, first, last, tau0, tau1, pst = _training_units(f, T_train)
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     n_val = int(((f.t >= val[0]) & (f.t < val[1])).sum())
-    best, best_state, bad, history = np.inf, None, 0, []
+    best, best_state, bad, history, start_epoch = np.inf, None, 0, [], 0
+    if run is not None and (ck := run.resume(model, opt)) is not None:
+        best, bad, start_epoch = ck["best"], ck["bad"], ck["epoch"] + 1
+        best_state = torch.load(run.path / "best.pt", weights_only=True) if (run.path / "best.pt").exists() else None
+        log(f"    resumed at epoch {start_epoch}, best val {best:.4f}")
     t_start = time.perf_counter()
-    for epoch in range(epochs):
+    for epoch in range(start_epoch, max_epochs):
         model.train()
-        perm = np.random.permutation(len(ks))
+        perm = np.random.permutation(len(units))
         if targets_per_epoch:
             perm = perm[:targets_per_epoch]
         total = 0.0
         for s in range(0, len(perm), batch_size):
-            kk = ks[perm[s:s + batch_size]]
-            h = model.encoder(_batch(f, kk - 1, N))
-            a_, b_ = model.head(h, torch.from_numpy(f.state[kk]))
-            lam = model.head.intensity(a_, b_, torch.as_tensor(f.t[kk] - f.t[kk - 1], dtype=DTYPE))
-            point = torch.log(lam[torch.arange(len(kk)), torch.from_numpy(f.side[kk])])
-            # pieces of these intervals
-            sel = np.concatenate([np.arange(first[i], last[i]) for i in perm[s:s + batch_size]])
-            owner = np.repeat(np.arange(len(kk)), last[perm[s:s + batch_size]] - first[perm[s:s + batch_size]])
-            a_p, b_p = model.head(h[owner], torch.from_numpy(pst[sel]))
-            comp = model.head.integral(a_p, b_p, torch.as_tensor(tau0[sel], dtype=DTYPE),
-                                       torch.as_tensor(tau1[sel], dtype=DTYPE)).sum(1)
-            loss = -(point.sum() - comp.sum()) / len(kk)
+            sel_units = perm[s:s + batch_size]
+            loss = -_unit_loglik(model, f, N, units, has_point, first, last, tau0, tau1, pst, sel_units) / len(sel_units)
             opt.zero_grad()
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 5.0)
             opt.step()
-            total += loss.item() * len(kk)
+            total += loss.item() * len(sel_units)
         v = -loglik(model, f, val[0], val[1], N) / n_val
+        secs = time.perf_counter() - t_start
         history.append((epoch, total / len(perm), v))
-        log(f"    epoch {epoch:2d}  train NLL/event {total / len(perm):8.4f}  val {v:8.4f}  ({time.perf_counter() - t_start:.0f}s)")
+        log(f"    epoch {epoch:2d}  train NLL/event {total / len(perm):8.4f}  val {v:8.4f}  ({secs:.0f}s)")
         if v < best - 1e-4:
             best, bad = v, 0
             best_state = {k: v_.detach().clone() for k, v_ in model.state_dict().items()}
+            if run is not None:
+                run.best(best_state)
         else:
             bad += 1
-            if bad >= patience:
-                break
+        if run is not None:
+            run.curve(epoch, total / len(perm), v, secs)
+            run.checkpoint(model, opt, epoch, best, bad)
+        if epoch + 1 >= min_epochs and bad >= patience:
+            break
     model.load_state_dict(best_state)
-    return {"val": best, "epochs": len(history), "seconds": time.perf_counter() - t_start, "history": history}
+    return {"val": best, "epochs": epoch + 1, "stopped_early": epoch + 1 < max_epochs,
+            "seconds": time.perf_counter() - t_start, "history": history}

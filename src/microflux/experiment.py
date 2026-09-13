@@ -68,13 +68,15 @@ def splits(T: float) -> dict[str, tuple[float, float]]:
     return {"train": (0.0, 0.70 * T), "val": (0.70 * T, 0.85 * T), "test": (0.85 * T, T)}
 
 
-def evaluate(p: Params, ev: Events, split: dict[str, tuple[float, float]], ks_on: str = "val") -> dict:
-    """Per-event NLL on every segment; KS(Exp1) per type on the `ks_on` segment.
+def evaluate(p: Params, ev: Events, split: dict[str, tuple[float, float]],
+             segments: tuple[str, ...] = ("train", "val"), ks_on: str = "val") -> dict:
+    """Per-event NLL on the named segments; KS(Exp1) per type on `ks_on`.
 
-    Validation by default. Scripts that select or diagnose must never see a
-    test statistic; the test segment is scored once, under PROTOCOL.md.
+    Train and validation only by default. Scripts that select or diagnose
+    must never see a test statistic; the test segment is scored once, by a
+    final-test script that asks for it explicitly, under PROTOCOL.md.
     """
-    out = {seg: -loglik(p, ev, a, b) / int(ev.window(a, b).sum()) for seg, (a, b) in split.items()}
+    out = {seg: -loglik(p, ev, *split[seg]) / int(ev.window(*split[seg]).sum()) for seg in segments}
     a, b = split[ks_on]
     out["ks"] = [ks_exp1(r) for r in rescaled_residuals(p, ev, a, b)]
     out["ks_on"] = ks_on
