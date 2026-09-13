@@ -79,13 +79,13 @@ def main() -> None:
         p = fit(ev.before(T_train))
         secs = time.perf_counter() - t_start
         fits[name] = p
-        rows.append((name, evaluate(extrapolate(p, ev, T_train), ev, split)))
+        rows.append((name, evaluate(extrapolate(p, ev, T_train), ev, split, ks_on="val")))
         print(f"  fitted {name:<28} {secs:6.1f}s   params={p.mu.size + p.alpha.size}")
 
-    print(f"\n{'model':<28}{'train':>9}{'val':>9}{'test':>9}   {'KS BUY':>7} {'KS SELL':>8}")
+    print(f"\n{'model':<28}{'train':>9}{'val':>9}{'test':>9}   {'val KS BUY':>11} {'SELL':>7}")
     print(f"{'':<28}{'NLL/event':>27}   {'test, Exp(1)':>16}")
     for name, r in rows:
-        print(f"{name:<28}{r['train']:9.4f}{r['val']:9.4f}{r['test']:9.4f}   {r['ks'][0]:7.4f} {r['ks'][1]:8.4f}")
+        print(f"{name:<28}{r['train']:9.4f}{r['val']:9.4f}{r['test']:9.4f}   {r['ks'][0]:11.4f} {r['ks'][1]:7.4f}")
     base = rows[2][1]["test"]
     print(f"\nheld-out gain over Hawkes x5 + mu(t), test NLL/event:")
     for name, r in rows[3:]:

@@ -68,11 +68,16 @@ def splits(T: float) -> dict[str, tuple[float, float]]:
     return {"train": (0.0, 0.70 * T), "val": (0.70 * T, 0.85 * T), "test": (0.85 * T, T)}
 
 
-def evaluate(p: Params, ev: Events, split: dict[str, tuple[float, float]]) -> dict:
-    """Per-event NLL on every segment; KS(Exp1) per type on test."""
+def evaluate(p: Params, ev: Events, split: dict[str, tuple[float, float]], ks_on: str = "val") -> dict:
+    """Per-event NLL on every segment; KS(Exp1) per type on the `ks_on` segment.
+
+    Validation by default. Scripts that select or diagnose must never see a
+    test statistic; the test segment is scored once, under PROTOCOL.md.
+    """
     out = {seg: -loglik(p, ev, a, b) / int(ev.window(a, b).sum()) for seg, (a, b) in split.items()}
-    a, b = split["test"]
+    a, b = split[ks_on]
     out["ks"] = [ks_exp1(r) for r in rescaled_residuals(p, ev, a, b)]
+    out["ks_on"] = ks_on
     return out
 
 
@@ -101,20 +106,35 @@ def block_loglik(p: Params, ev: Events, a: float, b: float, block_s: float) -> t
     return ll, n
 
 
+def gain_ci_from_blocks(d: np.ndarray, n: np.ndarray, n_boot: int = 2000, seed: int = 0) -> tuple[float, float, float]:
+    """Gain per event and its 95% bootstrap interval from per-block
+    log-likelihood differences `d` and event counts `n`."""
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, len(d), (n_boot, len(d)))
+    boot = d[idx].sum(1) / n[idx].sum(1)
+    return float(d.sum() / n.sum()), float(np.quantile(boot, 0.025)), float(np.quantile(boot, 0.975))
+
+
 def gain_ci(p_ref: Params, p_new: Params, ev_ref: Events, ev_new: Events, a: float, b: float,
             block_s: float = 60.0, n_boot: int = 2000, seed: int = 0) -> tuple[float, float, float]:
     """Held-out NLL/event gain of `p_new` over `p_ref` with a 95% block-bootstrap interval.
 
     Both models are scored on the same time blocks; the per-block difference
-    is resampled with replacement. Returns (gain, lo, hi).
+    is resampled with replacement. Returns (gain, lo, hi). A gain small
+    enough to matter only under one block size is not a gain: see
+    `gain_ci_blocks`.
     """
     ll_r, n = block_loglik(p_ref, ev_ref, a, b, block_s)
     ll_n, _ = block_loglik(p_new, ev_new, a, b, block_s)
-    d = ll_n - ll_r
-    rng = np.random.default_rng(seed)
-    idx = rng.integers(0, len(d), (n_boot, len(d)))
-    boot = d[idx].sum(1) / n[idx].sum(1)
-    return float(d.sum() / n.sum()), float(np.quantile(boot, 0.025)), float(np.quantile(boot, 0.975))
+    return gain_ci_from_blocks(ll_n - ll_r, n, n_boot, seed)
+
+
+def gain_ci_blocks(p_ref: Params, p_new: Params, ev_ref: Events, ev_new: Events, a: float, b: float,
+                   sizes: tuple[float, ...] = (60.0, 300.0, 900.0)) -> list[tuple[float, float, float, float]]:
+    """`gain_ci` at several block sizes: (block_s, gain, lo, hi) each. Wider
+    blocks respect longer dependence and widen the interval; a tiny gain
+    should be read against the widest."""
+    return [(s, *gain_ci(p_ref, p_new, ev_ref, ev_new, a, b, block_s=s)) for s in sizes]
 
 
 def shuffle_within(x: np.ndarray, groups: np.ndarray, seed: int) -> np.ndarray:

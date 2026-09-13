@@ -73,13 +73,13 @@ def main() -> None:
     p_both, s3 = fit(ev_both, state_baseline=True)
     print(f"\n  fitted: flat {s0:.0f}s   marks {s1:.0f}s   state {s2:.0f}s   both {s3:.0f}s")
 
-    print(f"\n{'model':<30}{'val NLL/event':>14}   {'gain over flat':>15}   {'95% CI':>18}   {'KS BUY':>7} {'KS SELL':>8}")
+    print(f"\n{'model':<30}{'val NLL/event':>14}   {'gain over flat':>15}   {'95% CI':>18}   {'val KS BUY':>11} {'SELL':>7}")
     rows = [("Hawkes x5 + mu(t)", p_flat, ev_flat), ("Hawkes x5 + mu(t) + k(c)", p_mark, ev_mark),
             ("Hawkes x5 + mu(t,s) + k(s)", p_state, ev_state), ("Hawkes x5 + mu(t,s) + k(s,c)", p_both, ev_both)]
     for name, p, ev in rows:
-        r = evaluate(p, ev, split)
+        r = evaluate(p, ev, split, ks_on="val")
         g, lo, hi = gain_ci(p_flat, p, ev_flat, ev, a_val, b_val)
-        print(f"{name:<30}{r['val']:14.4f}   {g:+15.4f}   [{lo:+.4f}, {hi:+.4f}]   {r['ks'][0]:7.4f} {r['ks'][1]:8.4f}")
+        print(f"{name:<30}{r['val']:14.4f}   {g:+15.4f}   [{lo:+.4f}, {hi:+.4f}]   {r['ks'][0]:11.4f} {r['ks'][1]:7.4f}")
 
     print(f"\ncontrol: marks shuffled within (split, side), {args.seeds} seeds")
     ctrl = []

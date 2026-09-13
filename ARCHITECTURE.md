@@ -127,7 +127,9 @@ fit_state.py        Stage 3 state-dependent excitation, with time-shift control
 fit_marks.py        Stage 3b marked excitation by fill count, with CIs and within-split shuffle control
 audit_marks.py      what the mark measures; grouping-rule sensitivity
 diagnose.py         residual diagnostics on validation, calibrated against a simulated null
-fit_extend.py       pre-registered classical extensions E1 / E2
+fit_extend.py       pre-registered classical extensions E1 / E2 / E1′, with the baseline–excitation decomposition
+fit_neural.py       Stage 4 pilot: summary MLP vs attention on a shared multiscale head, vs the best classical
+├── neural.py       features, shared intensity head (exact piecewise integration), SummaryMLP, Attention, training
 tests/              recovery-from-known-truth tests
 data/               replayed book cache (gitignored)
 ```
@@ -509,7 +511,7 @@ Excitation from **5+ fill orders concentrates at the 5–50 ms scales** with lit
 
 **Decision.** Every goodness-of-fit statistic is reported next to a null: the fitted model simulated on the real state function with train mark frequencies, passed through the observation process (`simulate.observe`: ms ticks, same-tick same-side merge), refitted, and diagnosed identically. Residual times are jittered within their tick (`residuals.jitter`, the discrete time-rescaling correction). Conditional residual means condition **only on features of the event that opened the interval** — the arriving event's mark or state is end-of-interval information and would select waiting times even under a correct model. Held-out gains carry 95% block-bootstrap intervals (60 s blocks). Controls shuffle marks within (split, side) over five seeds. The 2026-09-09 test segment is **exploratory**; `PROTOCOL.md` fixes what will be computed on fresh sessions.
 
-**What the null established.** The diagnostics are unbiased (every simulated bin 1.00 ± s.e., autocorrelation ≈ 0). Under a correct model the 1% residual quantile is inflated **2.6–2.8×** and the KS floor is **0.028** — both from the observation process. Without calibration the low-quantile excess on real data would have been misread as a short-lag misfit.
+**What the null showed.** The diagnostics are unbiased (every simulated bin 1.00 ± s.e., autocorrelation ≈ 0). Under a correct model the 1% residual quantile is inflated **2.6–2.8×** and KS is **0.028** — a *simulated null reference* from two replicates with an approximate mark aggregation in `observe`, not a universal floor. Without calibration the low-quantile excess on real data would have been misread as a short-lag misfit.
 
 **What is left, on validation (M4).**
 - Residual mean ≈ 1.10 across every bin, rising 1.04 → 1.12 through the window: the train-mean baseline **over-predicts a quieter period**. Rate tracking, not kernel shape. Dominant.
@@ -530,11 +532,29 @@ Excitation from **5+ fill orders concentrates at the 5–50 ms scales** with lit
 
 **Result (validation, exploratory session).** Gains over M4 with 95% intervals: **E1** (+500 s, +5000 s scales) +0.0011 [+0.0007, +0.0015]; **E2** (ten half-decade scales) +0.0008 [+0.0000, +0.0015]; E1+E2 +0.0014. KS 0.055 → 0.053. The residual mean by hour is **unchanged**: 1.04 / 1.10 / 1.12 under every grid. H7 refuted for E1 as registered; H8 not confirmed.
 
-**Why E1 cannot work.** Excitation is non-negative. A Hawkes intensity is `μ_frozen + Σ(positive kernels) ≥ μ_frozen`; on a held-out window quieter than the training mean, no kernel of any timescale can bring the intensity *down* to the observed rate. The over-prediction is a property of the additive-positive structure with a frozen baseline, not of the scale grid. The slow scales fitted on train are small (branching 0.05–0.35) because the 15-minute blocks already absorb the level there; out of sample they have nothing to track with.
+**Why E1 does not help — corrected in D12.** This entry originally argued that the frozen baseline is a floor the intensity cannot fall below, so no kernel could track a quieter window. That is true as a statement about the structure and wrong as an explanation of the residual: the decomposition in D12 shows the observed validation count sits far *above* the baseline alone, so the floor never binds and the over-prediction is in the excitation term. What is true is that the slow scales fitted alongside 15-minute blocks are small (branching 0.05–0.35) because the blocks absorb the level in-sample, and out of sample they have nothing to track with.
 
-**What is left, restated.** Above the observation floor (KS 0.028), the working model leaves ≈ 0.025 of KS and a ~10% over-prediction on the quieter window, plus short-lag residual autocorrelation that E2 shows is not a matter of kernel resolution. Both point at the same missing capability: **intensity that can fall below the exogenous level as a function of recent history.** Two families have it — an excitation-carried baseline with no time blocks (E1′: slow scales, single μ, so recent activity *is* the level), and any model whose history representation can lower the intensity (`docs/ml-design-brief.md` N2). Neither is run in this pass; E1′ is the next pre-registration.
+**What is left, restated.** Against the simulated null reference (KS 0.028), the working model leaves ≈ 0.025 of KS and a ~8% over-prediction on the quieter window, plus short-lag residual autocorrelation that E2 shows is not a matter of kernel resolution. The over-prediction is excitation that does not materialise (D12). Two families can respond to that — an excitation-carried level with no time blocks (E1′), and any model whose history representation can lower the intensity — and E1′ is run in D12.
 
 **Consequences.** (1) Under `PROTOCOL.md` §7 the neural benchmark is whichever classical model wins on validation of the session under test; on this session that is E1+E2 by +0.0014 — statistically nonzero, practically negligible next to the gains that would matter. (2) The neural design brief is sharpened: not "interactions" in the abstract, but whether letting history lower the intensity explains the remaining residual. (3) Slow cross-side branching in E1 (SELL←BUY 0.35 at 500 s) is small in likelihood terms and is treated as drift absorption until a fresh session says otherwise.
+
+---
+
+### D12 — The floor does not bind; E1′ is the best classical model (2026-09-13)
+
+**Decomposition (validation, benchmark M4).** Predicted count split into baseline and excitation, against the observed:
+
+```
+            observed   baseline   excitation   predicted
+BUY            7,573      2,241        5,954       8,195
+SELL           6,087      2,209        4,482       6,691
+```
+
+The observed count is more than three times the baseline alone. A lower intensity was always reachable with the same baseline and less excitation, so the frozen baseline is not what over-predicts — **the excitation term does**, by ~8%. D11's floor argument is withdrawn as an explanation. Rate over-prediction on a quiet window says the model expects more follow-on than materialises, which is a statement about the kernels or about their conditioning, not about μ.
+
+**E1′ — slow scales, single time block per state.** Validation gain over M4 **+0.0039** [+0.0025, +0.0055] at 60 s blocks, [+0.0030, +0.0050] at 300 s, [+0.0032, +0.0049] at 900 s. Best classical model on this session. Residual mean by hour 1.04 / 1.10 / 1.12 → **1.04 / 1.07 / 1.08**; predicted BUY count 8,195 → 8,012; KS BUY 0.042 → 0.038. It gets there by carrying the level in excitation rather than the baseline: baseline BUY 2,241 → 1,492, and very slow same-side branching of 0.40 (500 s) and 0.46 (5000 s). Because that component decays when activity falls, the intensity follows a quiet window down where a frozen baseline cannot. H9 partially met on the exploratory session: the gain interval excludes zero; the residual drift is reduced, not removed.
+
+**Consequences.** (1) E1′ is the classical reference for the neural pilot on this session. (2) Roughly a third of the validation over-prediction is addressable by letting recent activity set the level; the rest is not explained by any exponential-kernel Hawkes tried. (3) The very slow branching in E1′ is an adaptive baseline in kernel form, not a claim about 5000-second propagation, and should be read that way.
 
 ---
 

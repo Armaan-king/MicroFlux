@@ -46,7 +46,7 @@ N*   neural models per docs/ml-design-brief.md      matched inputs first, extend
 
 ## 4. Metrics (fixed)
 
-- **Primary:** held-out negative log-likelihood per event, reported as the **gain** over the relevant reference with a **95% block-bootstrap interval** (60 s blocks, 2000 resamples; `experiment.gain_ci`). Both models scored on identical blocks.
+- **Primary:** held-out negative log-likelihood per event, reported as the **gain** over the relevant reference with a **95% block-bootstrap interval** (60 s blocks, 2000 resamples; `experiment.gain_ci`), with 300 s and 900 s blocks as sensitivity (`experiment.gain_ci_blocks`). Both models scored on identical blocks. Validation scripts compute KS on validation only (`evaluate(ks_on="val")`).
 - **Goodness of fit:** time-rescaling residuals on **jittered** times (`residuals.jitter`), KS distance from Exp(1) per side, and conditional residual means by features of the **interval opener** (mark, state, burst count in the prior 100 ms, time since last opposite-side event, hour). Every statistic is reported next to a **simulated null**: the fitted model simulated on the same state function with train mark frequencies, passed through `simulate.observe` (ms ticks, same-tick merge), refitted, and diagnosed identically; ≥ 2 replicates.
 - **Secondary:** next-event type accuracy and log-time error, for neural models and the benchmark alike.
 
@@ -74,7 +74,7 @@ Each stated with the statistic that tests it and the direction predicted from th
 
 ## 7. Neural comparison (decision rule)
 
-A neural model is judged on validation gains over **the best classical model on the ladder** (M4, E1 or E2, whichever wins on validation), with matched inputs first. It earns a place in the analysis if its gain interval excludes zero on validation **and** the direction replicates on ≥ 2 fresh sessions under this protocol. Passing residual diagnostics does not make it right; failing them does make it wrong.
+A neural model is judged on validation gains over **the best classical model on the ladder** (M4, E1, E2, E1′ or a retained combination, whichever wins on validation of the session under test), with matched inputs first. Gains are read at 60 s, 300 s and 900 s block sizes; a gain that holds only at the narrowest is not reported as one. Neural fits use ≥ 3 training seeds and report the spread and the runtime. It earns a place in the analysis if its gain interval excludes zero on validation **and** the direction replicates on ≥ 2 fresh sessions under this protocol. Passing residual diagnostics does not make it right; failing them does make it wrong.
 
 Extended-input runs report the gain over the matched-input run of the same architecture, so the value of new information and the value of the architecture are never added together.
 
@@ -84,3 +84,5 @@ Extended-input runs report the gain over the matched-input run of the same archi
 
 - **2026-09-13** — frozen after the diagnostics pass on 2026-09-09 (ARCHITECTURE.md D9–D10).
 - **2026-09-13** — E1 and E2 run on the exploratory session (D11): H7 refuted for E1, H8 not confirmed. E1′ and H9 added; apply to fresh sessions only.
+- **2026-09-13** — E1′ run on the exploratory session (D12): gain +0.0039 with all three block sizes excluding zero; residual drift reduced, not removed. H9 partially met; stands for fresh sessions.
+- **2026-09-13** — test isolation fixed: `evaluate` scored KS on test in every validation script; now validation by default. §7 comparator list includes E1′ and retained combinations; block-size sensitivity and training seeds added.

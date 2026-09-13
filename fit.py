@@ -62,14 +62,14 @@ def main() -> None:
         p = fit()
         secs = time.perf_counter() - t0
         fits[name] = p
-        rows.append((name, evaluate(extrapolate(p, ev, T_train), ev, split), p.spectral_radius, secs))
+        rows.append((name, evaluate(extrapolate(p, ev, T_train), ev, split, ks_on="val"), p.spectral_radius, secs))
         print(f"  fitted {name:<20} {secs:6.1f}s")
 
-    print(f"\n{'model':<20}{'train':>9}{'val':>9}{'test':>9}   {'KS BUY':>7} {'KS SELL':>8}   {'rho':>6}")
+    print(f"\n{'model':<20}{'train':>9}{'val':>9}{'test':>9}   {'val KS BUY':>11} {'SELL':>7}   {'rho':>6}")
     print(f"{'':<20}{'NLL/event':>27}   {'test, Exp(1)':>16}")
     for name, ev_, rho, _ in rows:
         print(f"{name:<20}{ev_['train']:9.4f}{ev_['val']:9.4f}{ev_['test']:9.4f}   "
-              f"{ev_['ks'][0]:7.4f} {ev_['ks'][1]:8.4f}   {rho:6.3f}")
+              f"{ev_['ks'][0]:11.4f} {ev_['ks'][1]:7.4f}   {rho:6.3f}")
 
     print("\n" + "=" * 70)
     print("A: does cross-excitation survive a drifting baseline?")
