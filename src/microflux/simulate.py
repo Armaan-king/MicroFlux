@@ -1,7 +1,9 @@
-"""Simulate a Hawkes process with known parameters, by Ogata thinning.
+"""Simulate a Hawkes process with known parameters, by Ogata thinning, and
+pass it through the observation process the real data went through.
 
-Exists so the likelihood can be tested against a truth -- the only proof
-that a fit is right. Not a research tool.
+Exists so the likelihood can be tested against a truth, and so every
+diagnostic can be calibrated against what a *correct* model would show
+under millisecond ticks and same-tick merging. Not a research tool.
 """
 
 import numpy as np
@@ -30,10 +32,14 @@ def simulate(
 ) -> Events:
     """Events on [0, T] under `p`. The baseline and the exciting type follow
     the given state function (state 0 throughout if none); each event draws
-    an iid mark class from `mark_prob` (class 0 if none)."""
+    an iid mark class from `mark_prob` -- shape (C,) shared, or (K, C) per
+    side (class 0 if none)."""
     rng = np.random.default_rng(seed)
     K, S = p.K, p.S
-    C = 1 if mark_prob is None else len(mark_prob)
+    if mark_prob is None:
+        mark_prob = np.ones((K, 1))
+    mark_prob = np.broadcast_to(np.asarray(mark_prob, float), (K, np.asarray(mark_prob).shape[-1]))
+    C = mark_prob.shape[1]
     stub = events(np.empty(0), np.empty(0, np.int64), K, step_t, step_s, S)
     R = np.zeros_like(p.alpha)
     mu_max = p.mu.max((0, 1))
@@ -50,10 +56,23 @@ def simulate(
         lam = p.mu[block_of(p.edges, here)[0], s] + (p.alpha * R).sum((0, 2))
         if rng.uniform() * bound < lam.sum():
             j = rng.choice(K, p=lam / lam.sum())
-            c = 0 if mark_prob is None else rng.choice(C, p=mark_prob)
+            c = rng.choice(C, p=mark_prob[j])
             times.append(t)
             types.append(j)
             marks.append(c)
             R[:, :, j + K * (s + S * c)] += 1.0
     return events(np.array(times), np.array(types, dtype=np.int64), K, stub.step_t, stub.step_s, S,
                   mark=np.array(marks, dtype=np.int64), C=C)
+
+
+def observe(ev: Events, tick: float = 1e-3) -> Events:
+    """What the capture would have recorded: times floored to the tick, and
+    consecutive same-side events in one tick merged into one (the merged
+    event keeps the larger mark class, as a summed fill count would land in
+    the larger class or above)."""
+    t = np.floor(ev.t / tick) * tick
+    keep = np.r_[True, (np.diff(t) != 0.0) | (ev.m[1:] != ev.m[:-1])]
+    run = np.cumsum(keep) - 1
+    c = np.zeros(run[-1] + 1, np.int64)
+    np.maximum.at(c, run, ev.c)
+    return events(t[keep], ev.m[keep], ev.K, ev.step_t, ev.step_s, ev.S, mark=c, C=ev.C)

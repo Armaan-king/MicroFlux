@@ -470,7 +470,7 @@ BUY<-BUY        ask-heavy  balanced  bid-heavy      SELL<-SELL     ask-heavy  ba
 
 ### D9 — Marks: the multi-scale kernel was two populations (2026-09-12)
 
-**Decision.** The fill count of an aggressive order (levels swept) is its mark, in classes 1 / 2–4 / 5–19 / 20+ (46 / 15 / 19 / 20% of orders). The mark class of the *exciting* order widens its exciting type, exactly as state does — non-parametric, still concave, and the shape of the effect is read off rather than assumed. `Events` carries `c` and `C`; `e = m + K (s + S c)`. The likelihood is for times and sides given marks; a mark density that is iid given side would not depend on the kernel and cannot change the fit.
+**Decision.** The fill count of an aggressive order is its mark, in classes 1 / 2–4 / 5–19 / 20+ (46 / 15 / 19 / 20% of orders). *Fill count is the number of trade rows in a same-millisecond same-side run* (`load.collapse_trades`): resting orders matched, not distinct price levels, and not verified to be one taker order. It is a proxy for how much liquidity was consumed; what is directly supported is that it predicts subsequent activity. The mark class of the *exciting* order widens its exciting type, exactly as state does — non-parametric, still concave, and the shape of the effect is read off rather than assumed. `Events` carries `c` and `C`; `e = m + K (s + S c)`. The likelihood is for times and sides given marks; a mark density that is iid given side would not depend on the kernel and cannot change the fit.
 
 **Held-out gain over `Hawkes x5 + μ(t)`, test NLL/event:**
 
@@ -483,7 +483,7 @@ state and marks                    +0.1593
 
 Marks are **8× more informative than state**, the shuffled control is zero, and KS drops by two-thirds — the marks were what the model was missing. Given marks, state adds only +0.005 of its solo +0.020: three-quarters of what imbalance "knew" was correlated with sweep depth.
 
-**Result — two populations, not one multi-scale kernel.** `BUY←BUY` branching by mark of the exciting order:
+**Result — the kernel depends strongly on the mark, and the timescale shifts with it.** `BUY←BUY` branching by mark of the exciting order:
 
 ```
  half-life    1 fill     2-4    5-19     20+
@@ -494,11 +494,11 @@ Marks are **8× more informative than state**, the shuffled control is zero, and
    50 s        0.054   0.001   0.000   0.000
 ```
 
-**Deep sweeps (5+ fills) excite only at 5–50 ms** and nothing after; **small orders (1–4 fills) excite only at 0.5–50 s** and almost nothing before. D5's "self-excitation at every decade" was these two superimposed: a fast reaction to visible sweeps (momentum, latency response) and a slow train of small orders (a metaorder being worked). The unmarked kernel averaged them. D7's state effect at 5 ms is confined to small orders (1-fill `BUY←BUY` 0.03 / 0.07 / 0.13 across ask-heavy / balanced / bid-heavy); for 20+ sweeps it is flat (0.94 / 0.89 / 0.86).
+Excitation from **5+ fill orders concentrates at the 5–50 ms scales** with little beyond; excitation from **1-fill orders concentrates at 0.5–50 s** with little at 5 ms. The 2–4 class carries both (0.39 at 5 ms, 0.44 at 500 ms), so the separation is a gradient, not two disjoint populations. A 5 ms half-life places half of that component's integrated effect inside 5 ms, not almost all of it. D5's "self-excitation at every decade" was the mark-average of these. *Mechanisms — a fast reaction to visible consumption of liquidity, a slow train of small child orders — are hypotheses, not findings.* D7's state effect at 5 ms is confined to small orders (1-fill `BUY←BUY` 0.03 / 0.07 / 0.13 across ask-heavy / balanced / bid-heavy); for 20+ sweeps it is flat (0.94 / 0.89 / 0.86).
 
 **Artifact check.** A sweep crossing a millisecond boundary would be split by `collapse_trades` into two orders 1 ms apart and masquerade as fast excitation. Measured: after a 20+ order, a same-side order follows at exactly +1 ms 21% of the time and at +2 ms 18% — a smooth decay, not a spike — and the +1 ms / (+2..5 ms) ratio is *lowest* for the 20+ class (2.65 vs 3.36 for single fills). Not splitting.
 
-**Consequences.** (1) Every propagation claim must condition on mark; unmarked kernels mix two mechanisms. (2) The working model is `Hawkes x5 + μ(t,s) + k(s,c)`: 378 parameters, J = 24, 81 s to fit, test NLL −0.256, KS 0.055 / 0.059. (3) Quantity (BTC) is a second candidate mark, correlated 0.53 with fills. (4) Still one session.
+**Consequences.** (1) Every propagation claim must condition on mark; unmarked kernels average over it. (2) The working model is `Hawkes x5 + μ(t,s) + k(s,c)`: 378 parameters, J = 24, 81 s to fit, test NLL −0.256, KS 0.055 / 0.059. (3) Quantity (BTC) is a second candidate mark, correlated 0.53 with fills. (4) Still one session.
 
 ---
 

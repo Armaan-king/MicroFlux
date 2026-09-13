@@ -19,9 +19,9 @@ SCALES = np.log(2.0) / HALF_LIVES
 CACHE = Path("data")
 
 
-def load_orders(root: str, symbol: str, date: str, minutes: float | None = None) -> pl.DataFrame:
+def load_orders(root: str, symbol: str, date: str, minutes: float | None = None, merge_gap_ns: int = 0) -> pl.DataFrame:
     """Aggressive orders in capture order, with `t` in seconds from the first."""
-    orders = collapse_trades(load_stream(partition(root, symbol, date), "trades"))
+    orders = collapse_trades(load_stream(partition(root, symbol, date), "trades"), merge_gap_ns)
     orders = orders.with_columns(
         ((pl.col("timestamp_ns") - orders["timestamp_ns"][0]) / 1e9).alias("t"),
         (pl.col("aggressor") == "sell").cast(pl.Int64).alias("m"),
@@ -55,7 +55,7 @@ def imbalance_state(orders: pl.DataFrame, book: pl.DataFrame, T_train: float) ->
     return step_t, np.digitize(imb, cuts), cuts
 
 
-MARK_EDGES = np.array([2, 5, 20])  # fill-count classes: 1 / 2-4 / 5-19 / 20+
+MARK_EDGES = np.array([2, 5, 20])  # fill-count classes: 1 / 2-4 / 5-19 / 20+  (fills = trade rows in the run)
 MARK_NAMES = ("1 fill", "2-4", "5-19", "20+")
 
 

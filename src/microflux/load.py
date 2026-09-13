@@ -74,7 +74,7 @@ def is_continuous(book_updates: pl.DataFrame) -> bool:
     return bool((edges["gap"] == 1).all())
 
 
-def collapse_trades(trades: pl.DataFrame) -> pl.DataFrame:
+def collapse_trades(trades: pl.DataFrame, merge_gap_ns: int = 0) -> pl.DataFrame:
     """Raw fills -> aggressive orders.
 
     Binance's ``@trade`` stream reports one row per fill, so a single marketable
@@ -82,17 +82,23 @@ def collapse_trades(trades: pl.DataFrame) -> pl.DataFrame:
     timestamp. Left raw, ~91% of consecutive trades are separated by dt=0 and
     every point-process likelihood degenerates.
 
-    Consecutive fills sharing `(timestamp_ns, aggressor)` are one aggressor's
-    decision, so they collapse to one event carrying the summed quantity and the
-    number of fills -- the depth of book that order consumed. This reconstructs
-    what Binance's ``@aggTrade`` stream would have delivered.
+    Consecutive fills sharing `(timestamp_ns, aggressor)` are treated as one
+    aggressor's decision and collapse to one event carrying the summed
+    quantity, the number of fills (trade rows: resting orders matched, not
+    price levels), and the number of distinct prices touched. This
+    approximates what Binance's ``@aggTrade`` stream would have delivered. It
+    cannot tell one taker order from two in the same millisecond, and it
+    splits one order whose fills straddle a millisecond boundary.
 
     Grouped on a run index, not on the timestamp alone: two genuinely separate
     orders can land in the same millisecond on opposite sides, and merging those
     would invent a trade that never happened.
+
+    `merge_gap_ns` > 0 also joins same-side runs separated by at most that gap
+    -- a sensitivity rule for the millisecond-boundary split, not the default.
     """
     run = (
-        (pl.col("timestamp_ns") != pl.col("timestamp_ns").shift(1))
+        ((pl.col("timestamp_ns") - pl.col("timestamp_ns").shift(1)) > merge_gap_ns)
         | (pl.col("aggressor") != pl.col("aggressor").shift(1))
     ).cum_sum().alias("run")
 
@@ -109,6 +115,7 @@ def collapse_trades(trades: pl.DataFrame) -> pl.DataFrame:
             pl.col("price").cast(pl.Float64).first().alias("price_first"),
             pl.col("price").cast(pl.Float64).last().alias("price_last"),
             pl.len().alias("fills"),
+            pl.col("price").n_unique().alias("levels"),
             pl.col("trade_id").first().alias("trade_id"),
         )
         .drop("run")
