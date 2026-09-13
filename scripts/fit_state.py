@@ -15,7 +15,7 @@ a step function of time. Seven fits, differing only in where the state enters:
 Tercile cuts come from train book rows only. Spread is not a state variable
 here: it is one tick 99.9% of the time on this capture.
 
-    python fit_state.py [--root C:/tickforge-runs] [--date 2026-09-09] [--block-minutes 15]
+    python scripts/fit_state.py [--root C:/tickforge-runs] [--date 2026-09-09] [--block-minutes 15]
 """
 
 import argparse

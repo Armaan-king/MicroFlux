@@ -60,7 +60,7 @@ next capture is taken. It is not re-captured on a chosen date.
 ## What is computed, per session, in this order
 
 ```
-python run_session.py --date <UTC date> --batch docs/collection-batch-1.json
+python scripts/run_session.py --date <UTC date> --batch docs/collection-batch-1.json
 ```
 
 The batch file enforces >= 8 h, distinct UTC dates, no overlap with and no

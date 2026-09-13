@@ -20,7 +20,7 @@ predicted validation count into baseline and excitation, against the
 observed count: over-prediction is a floor problem only if the observed
 count is below the baseline alone.
 
-    python fit_extend.py [--root C:/tickforge-runs] [--date 2026-09-09]
+    python scripts/fit_extend.py [--root C:/tickforge-runs] [--date 2026-09-09]
 """
 
 import argparse

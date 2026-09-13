@@ -11,7 +11,7 @@ blocks). The control shuffles marks within (split, side) so the label keeps
 its split and its side-conditional distribution and loses only its timing;
 several seeds give its spread. The test segment is exploratory.
 
-    python fit_marks.py [--root C:/tickforge-runs] [--date 2026-09-09] [--seeds 5]
+    python scripts/fit_marks.py [--root C:/tickforge-runs] [--date 2026-09-09] [--seeds 5]
 """
 
 import argparse

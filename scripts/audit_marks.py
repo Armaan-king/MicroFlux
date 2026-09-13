@@ -12,7 +12,7 @@ whether the mark effect is an artifact of where a run is cut.
 Evaluated on the validation segment. The 2026-09-09 test segment has been
 inspected repeatedly and is exploratory from here on.
 
-    python audit_marks.py [--root C:/tickforge-runs] [--date 2026-09-09]
+    python scripts/audit_marks.py [--root C:/tickforge-runs] [--date 2026-09-09]
 """
 
 import argparse

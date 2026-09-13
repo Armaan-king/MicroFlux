@@ -20,7 +20,7 @@ Everything learned so far comes from one 8-hour capture (BTCUSDT, 2026-09-09) wh
 
 ## 1b. Session eligibility and selection (fixed 2026-09-13)
 
-A TickForge partition is one **session** if `load.is_continuous` holds across all its files; otherwise each continuous run is its own session. A session is **eligible** for replication if it has ≥ 1 snapshot, span ≥ 1 h, ≥ 10,000 collapsed orders, and **no time overlap** with any session already used for exploration or a prior replication. Sessions are taken in chronological order of capture as they become eligible; none is skipped or chosen on its results. Every session runs the same configuration: `replicate.py` for the classical ladder, controls, diagnostics and H1–H9, then `fit_neural.py`, then `final_test.py` once.
+A TickForge partition is one **session** if `load.is_continuous` holds across all its files; otherwise each continuous run is its own session. A session is **eligible** for replication if it has ≥ 1 snapshot, span ≥ 1 h, ≥ 10,000 collapsed orders, and **no time overlap** with any session already used for exploration or a prior replication. Sessions are taken in chronological order of capture as they become eligible; none is skipped or chosen on its results. Every session runs the same configuration: `scripts/replicate.py` for the classical ladder, controls, diagnostics and H1–H9, then `scripts/fit_neural.py`, then `scripts/final_test.py` once — all three via `scripts/run_session.py`.
 
 Inventory at freeze: `BTCUSDT-2026-09-09` (8.00 h, 11:32–19:32 UTC) — **exploratory**; `BTCUSDT-2026-09-09-early` (2.00 h, 05:04–07:04 UTC, `C:/tickforge-runs/archive-2h`) — **eligible, fresh session 1**; 2026-09-07 and 2026-09-08 partitions (1.2 min and 0.6 min) — ineligible. A second fresh session requires a new capture.
 
@@ -84,7 +84,7 @@ A neural model is judged on validation gains over **the best classical model on 
 
 Extended-input runs report the gain over the matched-input run of the same architecture, so the value of new information and the value of the architecture are never added together.
 
-**Executable defaults (fixed 2026-09-13, `fit_neural.py`):** MLP over activity summaries and attention over the last **N = 64** event tokens, both on the shared five-scale head; width 64, 2 layers, 4 heads; seeds **0, 1, 2, 3, 4**; patience **8**; **minimum 10, maximum 40** epochs; 40,000 training units per epoch; Adam 1e-3; float32. Reported: MLP vs reference, attention vs reference, attention vs MLP paired within seed, each at 60 / 300 / 900 s; seed s.d. of validation NLL separately. On a session shorter than ~4 h the 300 s and 900 s intervals rest on too few blocks and are reported but not read. N = 64 is a practical pilot choice, not a finding.
+**Executable defaults (fixed 2026-09-13, `scripts/fit_neural.py`):** MLP over activity summaries and attention over the last **N = 64** event tokens, both on the shared five-scale head; width 64, 2 layers, 4 heads; seeds **0, 1, 2, 3, 4**; patience **8**; **minimum 10, maximum 40** epochs; 40,000 training units per epoch; Adam 1e-3; float32. Reported: MLP vs reference, attention vs reference, attention vs MLP paired within seed, each at 60 / 300 / 900 s; seed s.d. of validation NLL separately. On a session shorter than ~4 h the 300 s and 900 s intervals rest on too few blocks and are reported but not read. N = 64 is a practical pilot choice, not a finding.
 
 ---
 

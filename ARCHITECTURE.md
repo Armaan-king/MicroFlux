@@ -108,7 +108,7 @@ The representation between these stages is intentionally not fixed yet.
 
 # Repository Structure
 
-Flat modules, one job each. Files appear when they have a purpose; the six planned subdirectories (`tickforge/ data/ models/ training/ evaluation/ analysis/`) are unused until a second module of the same kind exists.
+Flat library modules, one job each; experiment scripts under `scripts/`, run from the repository root. Files appear when they have a purpose; the six planned subdirectories (`tickforge/ data/ models/ training/ evaluation/ analysis/`) are unused until a second module of the same kind exists.
 
 ```text
 src/microflux/
@@ -121,19 +121,19 @@ src/microflux/
 ├── simulate.py     Ogata thinning — synthetic truth for the tests
 └── experiment.py   shared loader, split, timescale grid, evaluator, cache
 
-explore.py          Stage 1 measurements
-fit.py              Stage 2 six-model ladder
-fit_state.py        Stage 3 state-dependent excitation, with time-shift control
-fit_marks.py        Stage 3b marked excitation by fill count, with CIs and within-split shuffle control
-audit_marks.py      what the mark measures; grouping-rule sensitivity
-diagnose.py         residual diagnostics on validation, calibrated against a simulated null
-fit_extend.py       pre-registered classical extensions E1 / E2 / E1′, with the baseline–excitation decomposition
-fit_neural.py       Stage 4: summary MLP vs attention on a shared multiscale head, 5 seeds, artifacts per run
-replicate.py        registered classical ladder, controls, diagnostics, H1-H9 on one session
-final_test.py       the one-time test-segment score for a session
-run_session.py      eligibility gate -> replicate -> fit_neural -> final_test, each stage once
-├── runs.py         per-run config, learning curve, resumable checkpoint, result, block contributions
-├── neural.py       features, shared intensity head (exact piecewise integration), SummaryMLP, Attention, training
+scripts/
+├── explore.py      Stage 1 measurements
+├── fit.py          Stage 2 six-model ladder
+├── fit_state.py    Stage 3 state-dependent excitation, with time-shift control
+├── fit_marks.py    Stage 3b marked excitation by fill count, with CIs and within-split shuffle control
+├── audit_marks.py  what the mark measures; grouping-rule sensitivity
+├── diagnose.py     residual diagnostics on validation, calibrated against a simulated null
+├── fit_extend.py   pre-registered classical extensions E1 / E2 / E1′, with the baseline–excitation decomposition
+├── fit_neural.py   Stage 4: summary MLP vs attention on a shared multiscale head, 5 seeds, artifacts per run
+├── replicate.py    registered classical ladder, controls, diagnostics, H1-H9 on one session
+├── final_test.py   the one-time test-segment score for a session
+└── run_session.py  eligibility gate -> replicate -> fit_neural -> final_test, each stage once
+notebooks/          01_neural_comparison.ipynb — walkthrough of the models from saved artifacts
 tests/              recovery-from-known-truth tests
 data/               replayed book cache (gitignored)
 ```

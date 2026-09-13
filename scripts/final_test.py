@@ -5,7 +5,7 @@ runs/<session>/summary.json (neural) and replication.json (classical).
 Refuses sessions listed in EXPLORATORY. Writes runs/<session>/final_test.json
 and appends a dated line to PROTOCOL.md's log so the touch is on record.
 
-    python final_test.py --root ... --date ... --session ...
+    python scripts/final_test.py --root ... --date ... --session ...
 """
 
 import argparse
@@ -19,7 +19,7 @@ import torch
 from microflux import neural
 from microflux.events import events
 from microflux.experiment import (
-    HALF_LIVES, MARK_NAMES, SCALES, block_loglik, gain_ci_from_blocks, imbalance_state, load_book,
+    HALF_LIVES, MARK_NAMES, REPO, SCALES, block_loglik, gain_ci_from_blocks, imbalance_state, load_book,
     load_orders, mark_class, splits,
 )
 from microflux.hawkes import block_edges
@@ -37,7 +37,7 @@ def main() -> None:
     ap.add_argument("--date", required=True)
     ap.add_argument("--session", required=True)
     ap.add_argument("--block-minutes", type=float, default=15.0)
-    ap.add_argument("--runs", default="runs")
+    ap.add_argument("--runs", default=str(REPO / "runs"))
     args = ap.parse_args()
     if args.session in EXPLORATORY:
         raise SystemExit(f"{args.session} is exploratory; its test segment is not scored.")
@@ -83,7 +83,7 @@ def main() -> None:
             print(f"{kind:<11} seed {seed}  test NLL {result['models'][f'{kind}_seed{seed}']['test_nll']:8.4f}   "
                   + "  ".join(f"{g[0]:+.4f} [{g[1]:+.4f}, {g[2]:+.4f}]@{s}s" for s, g in gains.items()))
     (out / "final_test.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
-    with open("PROTOCOL.md", "a", encoding="utf-8") as h:
+    with open(REPO / "PROTOCOL.md", "a", encoding="utf-8") as h:
         h.write(f"- **{time.strftime('%Y-%m-%d')}** — final test scored once on `{args.session}` (runs/{args.session}/final_test.json).\n")
     print(f"\nwritten {out / 'final_test.json'}; PROTOCOL.md log appended")
 

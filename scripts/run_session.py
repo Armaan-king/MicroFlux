@@ -4,8 +4,8 @@ stage once. Already-evaluated data is recognised by its fingerprint, not by
 the output folder name; an existing stage is skipped only if its artifacts
 record the same data and the frozen configuration, else the run refuses.
 
-    python run_session.py --date 2026-09-14 --batch docs/collection-batch-1.json
-    python run_session.py --root C:/tickforge-runs/archive-2h --date 2026-09-09 --session BTCUSDT-2026-09-09-early
+    python scripts/run_session.py --date 2026-09-14 --batch docs/collection-batch-1.json
+    python scripts/run_session.py --root C:/tickforge-runs/archive-2h --date 2026-09-09 --session BTCUSDT-2026-09-09-early
 """
 
 import argparse
@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 from microflux.batch import batch_check, load_json, record_failure, register
-from microflux.experiment import session_eligibility
+from microflux.experiment import REPO, session_eligibility
 
 FROZEN = {"N": 64, "width": 64, "layers": 2, "heads": 4, "max_epochs": 40, "min_epochs": 10, "patience": 8,
           "targets_per_epoch": 40_000}
@@ -52,15 +52,15 @@ def main() -> None:
     ap.add_argument("--symbol", default="BTCUSDT")
     ap.add_argument("--date", required=True)
     ap.add_argument("--session", default=None)
-    ap.add_argument("--runs", default="runs")
-    ap.add_argument("--batch", default=None, help="batch plan JSON; enforces its rules and records the outcome")
+    ap.add_argument("--runs", default=str(REPO / "runs"))
+    ap.add_argument("--batch", default=None, help="batch plan JSON (relative to the repository root); enforces its rules and records the outcome")
     ap.add_argument("--role", default=None, help="registry role; default 'batch:<name>' or 'fresh'")
     args = ap.parse_args()
     session = args.session or f"{args.symbol}-{args.date}"
     out = Path(args.runs) / session
     out.mkdir(parents=True, exist_ok=True)
     registry_path = Path(args.runs) / "registry.json"
-    batch_path = Path(args.batch) if args.batch else None
+    batch_path = (REPO / args.batch) if args.batch else None
     batch = load_json(batch_path, None) if batch_path else None
     if batch_path and batch is None:
         raise SystemExit(f"batch file {batch_path} not found; refusing to run without its rules")
@@ -93,7 +93,7 @@ def main() -> None:
             print(f"-- {script}: {marker} exists and matches this data and the frozen configuration; skipping")
             continue
         print(f"-- {script}")
-        subprocess.run([sys.executable, "-u", script, *common], check=True)
+        subprocess.run([sys.executable, "-u", str(Path(__file__).parent / script), *common], check=True, cwd=REPO)
 
     role = args.role or (f"batch:{batch['name']}" if batch else "fresh")
     if already is None:

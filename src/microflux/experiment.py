@@ -16,7 +16,8 @@ from microflux.load import collapse_trades, is_continuous, load_stream, partitio
 TYPES = ("BUY", "SELL")
 HALF_LIVES = np.array([0.005, 0.05, 0.5, 5.0, 50.0])  # seconds; one decade apart
 SCALES = np.log(2.0) / HALF_LIVES
-CACHE = Path("data")
+REPO = Path(__file__).resolve().parents[2]  # the repository root, wherever a script is run from
+CACHE = REPO / "data"
 
 
 def load_orders(root: str, symbol: str, date: str, minutes: float | None = None, merge_gap_ns: int = 0) -> pl.DataFrame:

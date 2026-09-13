@@ -6,7 +6,7 @@ diagnostics, and evaluates hypotheses H1-H9 with their registered
 statistics. Writes runs/<session>/replication.json and replication.md.
 Validation only; the test segment belongs to final_test.py.
 
-    python replicate.py --root C:/tickforge-runs/archive-2h --date 2026-09-09 --session BTCUSDT-2026-09-09-early
+    python scripts/replicate.py --root C:/tickforge-runs/archive-2h --date 2026-09-09 --session BTCUSDT-2026-09-09-early
 """
 
 import argparse
@@ -18,7 +18,7 @@ import numpy as np
 
 from microflux.events import events
 from microflux.experiment import (
-    HALF_LIVES, MARK_NAMES, SCALES, TYPES, gain_ci_blocks, imbalance_state, load_book, load_orders,
+    HALF_LIVES, MARK_NAMES, REPO, SCALES, TYPES, gain_ci_blocks, imbalance_state, load_book, load_orders,
     mark_class, shuffle_within, split_id, splits,
 )
 from microflux.hawkes import block_edges
@@ -80,7 +80,7 @@ def main() -> None:
     ap.add_argument("--session", required=True)
     ap.add_argument("--block-minutes", type=float, default=15.0)
     ap.add_argument("--replicates", type=int, default=2)
-    ap.add_argument("--runs", default="runs")
+    ap.add_argument("--runs", default=str(REPO / "runs"))
     args = ap.parse_args()
     out = Path(args.runs) / args.session
     out.mkdir(parents=True, exist_ok=True)

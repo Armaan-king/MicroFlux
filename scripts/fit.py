@@ -15,7 +15,7 @@ says whether any of them actually fits. The test segment is not touched;
 D4/D5 quoted test numbers from before the protocol froze and are
 exploratory.
 
-    python fit.py [--root C:/tickforge-runs] [--date 2026-09-09] [--minutes N] [--block-minutes 15]
+    python scripts/fit.py [--root C:/tickforge-runs] [--date 2026-09-09] [--minutes N] [--block-minutes 15]
 """
 
 import argparse

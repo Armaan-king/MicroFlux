@@ -14,7 +14,7 @@ the arriving event is used.
 
 Validation only. The test segment is exploratory from here on.
 
-    python diagnose.py [--root C:/tickforge-runs] [--date 2026-09-09] [--replicates 2]
+    python scripts/diagnose.py [--root C:/tickforge-runs] [--date 2026-09-09] [--replicates 2]
 """
 
 import argparse

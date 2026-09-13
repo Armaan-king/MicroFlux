@@ -4,7 +4,7 @@ Answers the questions GOAL.md makes a precondition for modelling: what the
 event rates are, whether arrivals cluster enough to justify a Hawkes process
 over a Poisson one, and at what resolution market state is actually observable.
 
-    python explore.py [--root C:/tickforge-runs] [--date 2026-09-09]
+    python scripts/explore.py [--root C:/tickforge-runs] [--date 2026-09-09]
 """
 
 import argparse

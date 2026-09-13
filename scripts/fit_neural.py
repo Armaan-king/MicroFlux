@@ -17,7 +17,7 @@ same blocks). Seed-to-seed variability is reported separately as the s.d.
 of validation NLL. Validation only; the test segment is scored by a
 separate final-test stage under PROTOCOL.md, never here.
 
-    python fit_neural.py [--date 2026-09-09] [--root C:/tickforge-runs] [--seeds 0,1,2,3,4]
+    python scripts/fit_neural.py [--date 2026-09-09] [--root C:/tickforge-runs] [--seeds 0,1,2,3,4]
 """
 
 import argparse
@@ -31,7 +31,7 @@ import torch
 from microflux import neural
 from microflux.events import events
 from microflux.experiment import (
-    HALF_LIVES, MARK_NAMES, SCALES, TYPES, block_loglik, gain_ci_from_blocks, imbalance_state,
+    HALF_LIVES, MARK_NAMES, REPO, SCALES, TYPES, block_loglik, gain_ci_from_blocks, imbalance_state,
     load_book, load_orders, mark_class, splits,
 )
 from microflux.hawkes import block_edges, loglik as hawkes_loglik
@@ -62,7 +62,7 @@ def main() -> None:
     ap.add_argument("--width", type=int, default=64)
     ap.add_argument("--layers", type=int, default=2)
     ap.add_argument("--heads", type=int, default=4)
-    ap.add_argument("--runs", default="runs")
+    ap.add_argument("--runs", default=str(REPO / "runs"))
     args = ap.parse_args()
     torch.set_num_threads(max(1, torch.get_num_threads() - 2))
     session = args.session or f"{args.symbol}-{args.date}"
