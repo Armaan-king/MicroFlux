@@ -1,6 +1,6 @@
 # ML Design Brief — Neural Temporal Point Process for MicroFlux
 
-**For decision, not implementation.** Each component below lists the realistic options, the trade-offs on *this* data, a recommendation, and the ablation that would test the choice. The benchmark throughout is M4 or its best pre-registered extension (`PROTOCOL.md` §3).
+**For decision, not implementation.** Each component below lists the realistic options, the trade-offs on *this* data, a recommendation, and the ablation that would test the choice. The benchmark throughout is the best classical model on the ladder on validation of the session under test (`PROTOCOL.md` §3, §7).
 
 What the classical work has established, and what the neural model must respect:
 
@@ -113,7 +113,8 @@ Per `PROTOCOL.md`:
 ## The comparison, as it would run
 
 ```
-benchmark  = M4 (E1 and E2 did not earn their parameters, D11)
+benchmark  = best classical on validation of the session under test (PROTOCOL.md s.7);
+             on 2026-09-09 that is E1+E2, ahead of M4 by +0.0014 (D11)
 E1'        = slow scales, single baseline   gain vs benchmark  →  rate tracking without blocks
 N1(B)      matched inputs         gain vs benchmark  →  kernel shape
 N2(B)      matched inputs         gain vs N1(B)      →  interactions
