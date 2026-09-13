@@ -128,7 +128,11 @@ fit_marks.py        Stage 3b marked excitation by fill count, with CIs and withi
 audit_marks.py      what the mark measures; grouping-rule sensitivity
 diagnose.py         residual diagnostics on validation, calibrated against a simulated null
 fit_extend.py       pre-registered classical extensions E1 / E2 / E1′, with the baseline–excitation decomposition
-fit_neural.py       Stage 4 pilot: summary MLP vs attention on a shared multiscale head, vs the best classical
+fit_neural.py       Stage 4: summary MLP vs attention on a shared multiscale head, 5 seeds, artifacts per run
+replicate.py        registered classical ladder, controls, diagnostics, H1-H9 on one session
+final_test.py       the one-time test-segment score for a session
+run_session.py      eligibility gate -> replicate -> fit_neural -> final_test, each stage once
+├── runs.py         per-run config, learning curve, resumable checkpoint, result, block contributions
 ├── neural.py       features, shared intensity head (exact piecewise integration), SummaryMLP, Attention, training
 tests/              recovery-from-known-truth tests
 data/               replayed book cache (gitignored)
@@ -581,6 +585,18 @@ Validation KS (jittered): E1′ 0.039 / 0.044; attention 0.014–0.030 / 0.022�
 
 **Consequences.** (1) N = 64 is a provisional practical choice for the corrected rerun, not a finding about memory. (2) Before fresh-session evaluation: patience 8, a fixed epoch floor, and 5 seeds, so the seed spread reflects the model rather than the stopping rule. (3) The next two experiments in the brief — continuous marks, then richer book features — are run against this attention model with the same head, each reported as its own increment. (4) The test segment of 2026-09-09 remains untouched by every neural model.
 
+
+### D14 — Corrected neural comparison, and the first fresh session (2026-09-13)
+
+Full report: `docs/report-2026-09-13.md`. Configuration frozen in `PROTOCOL.md` §7; artifacts under `runs/`.
+
+**Exploratory session (`BTCUSDT-2026-09-09`, validation, 72 / 15 / 5 blocks).** Reference E1′. Five seeds, patience 8, epochs 10–40. MLP over activity summaries: −0.0040 vs E1′, seed s.d. 0.0040, no seed better. Attention N = 64: **+0.0257 vs E1′**, seed s.d. **0.0029**, 5/5 seeds clear of zero at every block size; attention − MLP paired within seed +0.0297, s.d. 0.0031. The pilot's seed spread was its stopping rule.
+
+**Fresh session 1 (`BTCUSDT-2026-09-09-early`, 2.00 h, 18 / 4 / 2 blocks — 300 s and 900 s intervals insufficient).** Classical: **H1 confirmed** (marks +0.1416 [+0.126, +0.158], control −0.0006 ± 0.0014); the ladder's spine replicates; H2 holds in direction and fails strict monotonicity; H3–H9 not confirmed as registered; E1′ worse than M4, so M4 is the reference. Neural, validation: MLP +0.0064, attention +0.0090, attention − MLP +0.0026 ± 0.0065 — no interval clear of zero. **Final test, scored once:** MLP −0.0140 ± 0.0030, attention −0.0057 ± 0.0100 (3/5 seeds negative). **The neural advantage was not replicated here.** That result stands in the evidence; the test segment is not reused.
+
+**What this does and does not say.** It does not say summaries carry no information (this MLP did not extract it), that attention is ineffective (it is robustly better on the exploratory session), or that training-set size caused the fresh-session result (untested). It says the protocol's replication requirement — the direction on ≥ 2 fresh sessions with intervals clear of zero — is not met after one.
+
+**Decision.** The classical model (M4, or E1′ where it wins on validation) remains the working reference. The attention result is **inconclusive**. Collection batch 1 (`docs/collection-batch-1.md`) — two further 8-hour sessions on different UTC dates, evaluated in capture order under the frozen protocol — answers the one open question: whether the exploratory-session gain appears on independent 8-hour data and survives its untouched test segment. All model extensions wait for it.
 ---
 
 # Open Decisions
