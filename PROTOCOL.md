@@ -18,6 +18,12 @@ Everything learned so far comes from one 8-hour capture (BTCUSDT, 2026-09-09) wh
 | state | L5 imbalance `(bid − ask) / (bid + ask)` over the top 5 levels, terciles; **cuts from train book rows of the same session** | `experiment.imbalance_state` |
 | time | seconds from the session's first order; ms ticks kept as recorded | `experiment.load_orders` |
 
+## 1b. Session eligibility and selection (fixed 2026-09-13)
+
+A TickForge partition is one **session** if `load.is_continuous` holds across all its files; otherwise each continuous run is its own session. A session is **eligible** for replication if it has ≥ 1 snapshot, span ≥ 1 h, ≥ 10,000 collapsed orders, and **no time overlap** with any session already used for exploration or a prior replication. Sessions are taken in chronological order of capture as they become eligible; none is skipped or chosen on its results. Every session runs the same configuration: `replicate.py` for the classical ladder, controls, diagnostics and H1–H9, then `fit_neural.py`, then `final_test.py` once.
+
+Inventory at freeze: `BTCUSDT-2026-09-09` (8.00 h, 11:32–19:32 UTC) — **exploratory**; `BTCUSDT-2026-09-09-early` (2.00 h, 05:04–07:04 UTC, `C:/tickforge-runs/archive-2h`) — **eligible, fresh session 1**; 2026-09-07 and 2026-09-08 partitions (1.2 min and 0.6 min) — ineligible. A second fresh session requires a new capture.
+
 ## 2. Split (fixed)
 
 70 / 15 / 15 **by time**, per session. Never shuffled.
@@ -53,7 +59,7 @@ N*   neural models per docs/ml-design-brief.md      matched inputs first, extend
 ## 5. Controls (fixed)
 
 - **Marks:** shuffled **within (split, side)** — the label keeps its split and its side-conditional distribution and loses only its timing. Five seeds; report mean and s.d. of the gain.
-- **State:** the state series circularly shifted **within each split** by five offsets (30, 60, 90, 120, 150 min). Report mean and s.d.
+- **State:** the state series circularly shifted **within each split** by five offsets at 1/6 … 5/6 of the segment's length (30 … 150 min on an 8 h session; scaled on shorter ones). Report mean and s.d.
 - A gain is attributable to the information only if it exceeds the control mean by more than three control s.d. and its own interval excludes zero.
 
 ## 6. Pre-registered hypotheses
@@ -78,6 +84,8 @@ A neural model is judged on validation gains over **the best classical model on 
 
 Extended-input runs report the gain over the matched-input run of the same architecture, so the value of new information and the value of the architecture are never added together.
 
+**Executable defaults (fixed 2026-09-13, `fit_neural.py`):** MLP over activity summaries and attention over the last **N = 64** event tokens, both on the shared five-scale head; width 64, 2 layers, 4 heads; seeds **0, 1, 2, 3, 4**; patience **8**; **minimum 10, maximum 40** epochs; 40,000 training units per epoch; Adam 1e-3; float32. Reported: MLP vs reference, attention vs reference, attention vs MLP paired within seed, each at 60 / 300 / 900 s; seed s.d. of validation NLL separately. On a session shorter than ~4 h the 300 s and 900 s intervals rest on too few blocks and are reported but not read. N = 64 is a practical pilot choice, not a finding.
+
 ---
 
 ## Log
@@ -85,5 +93,6 @@ Extended-input runs report the gain over the matched-input run of the same archi
 - **2026-09-13** — frozen after the diagnostics pass on 2026-09-09 (ARCHITECTURE.md D9–D10).
 - **2026-09-13** — E1 and E2 run on the exploratory session (D11): H7 refuted for E1, H8 not confirmed. E1′ and H9 added; apply to fresh sessions only.
 - **2026-09-13** — E1′ run on the exploratory session (D12): gain +0.0039 with all three block sizes excluding zero; residual drift reduced, not removed. H9 partially met; stands for fresh sessions.
-- **2026-09-13** — neural pilot on the exploratory session (D13): summaries-MLP −0.0020 ± 0.0034 vs E1′; attention N = 64 +0.0164 ± 0.0084, 3/3 seeds clear zero; N = 128 no different. Fresh-session neural runs use N = 64, patience 8, an epoch floor, 5 seeds.
+- **2026-09-13** — four implementation defects found in review of the pilot (D13) fixed with regression tests; pilot numbers superseded. Session eligibility (§1b), scaled state-shift offsets, and executable neural defaults fixed. `final_test.py` is the only path that scores a test segment.
+- **2026-09-13** — neural pilot on the exploratory session (D13, superseded): summaries-MLP −0.0020 ± 0.0034 vs E1′; attention N = 64 +0.0164 ± 0.0084, 3/3 seeds clear zero; N = 128 no different. Fresh-session neural runs use N = 64, patience 8, an epoch floor, 5 seeds.
 - **2026-09-13** — test isolation fixed: `evaluate` scored KS on test in every validation script; now validation by default. §7 comparator list includes E1′ and retained combinations; block-size sensitivity and training seeds added.
