@@ -32,7 +32,9 @@ def load_orders(root: str, symbol: str, date: str, minutes: float | None = None,
 def load_book(root: str, symbol: str, date: str) -> pl.DataFrame:
     """1 Hz book state, replayed once and cached; ~2 min from cold."""
     CACHE.mkdir(exist_ok=True)
-    path = CACHE / f"book-{symbol}-{date}.parquet"
+    import hashlib
+    tag = hashlib.sha1(str(Path(root).resolve()).encode()).hexdigest()[:8]  # two roots can hold the same date
+    path = CACHE / f"book-{symbol}-{date}-{tag}.parquet"
     if path.exists():
         return pl.read_parquet(path)
     d = partition(root, symbol, date)
