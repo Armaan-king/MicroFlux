@@ -1,0 +1,112 @@
+BTCUSDT-2026-09-09: 147,216 orders over 8.00h   train < 5.60h   val [5.60h, 6.80h) n=13,660   code 89164d348e391fd7a5bd96b245605f187e85819e+dirty
+  M4         val NLL/event  -0.4396   val KS 0.0432 / 0.0450   (95s)
+  E1'        val NLL/event  -0.4435   val KS 0.0385 / 0.0439   (268s)
+  reference = E1'
+
+model       seed  val NLL                vs E1' (60 s)                        300 s                        900 s          val KS    ep  stop   time
+    epoch  0  train NLL/event  -0.6576  val  -0.1015  (3s)
+    epoch  1  train NLL/event  -1.0097  val  -0.1811  (6s)
+    epoch  2  train NLL/event  -1.1055  val  -0.2674  (9s)
+    epoch  3  train NLL/event  -1.1672  val  -0.3084  (12s)
+    epoch  4  train NLL/event  -1.2347  val  -0.3318  (14s)
+    epoch  5  train NLL/event  -1.2409  val  -0.3784  (17s)
+    epoch  6  train NLL/event  -1.2787  val  -0.3806  (20s)
+    epoch  7  train NLL/event  -1.2930  val  -0.3881  (23s)
+    epoch  8  train NLL/event  -1.2988  val  -0.3904  (26s)
+    epoch  9  train NLL/event  -1.3138  val  -0.4076  (29s)
+    epoch 10  train NLL/event  -1.3186  val  -0.4067  (31s)
+    epoch 11  train NLL/event  -1.3188  val  -0.4085  (35s)
+    epoch 12  train NLL/event  -1.3151  val  -0.4176  (38s)
+    epoch 13  train NLL/event  -1.3058  val  -0.4151  (40s)
+    epoch 14  train NLL/event  -1.3239  val  -0.4087  (44s)
+    epoch 15  train NLL/event  -1.3059  val  -0.4245  (48s)
+    epoch 16  train NLL/event  -1.3159  val  -0.4278  (52s)
+    epoch 17  train NLL/event  -1.3392  val  -0.4224  (56s)
+    epoch 18  train NLL/event  -1.3198  val  -0.4224  (59s)
+    epoch 19  train NLL/event  -1.3291  val  -0.4265  (62s)
+    epoch 20  train NLL/event  -1.3460  val  -0.4347  (66s)
+    epoch 21  train NLL/event  -1.3506  val  -0.4228  (68s)
+    epoch 22  train NLL/event  -1.3383  val  -0.4359  (72s)
+    epoch 23  train NLL/event  -1.3180  val  -0.4328  (76s)
+    epoch 24  train NLL/event  -1.3373  val  -0.4324  (79s)
+    epoch 25  train NLL/event  -1.3294  val  -0.4312  (83s)
+    epoch 26  train NLL/event  -1.3270  val  -0.4331  (87s)
+    epoch 27  train NLL/event  -1.3302  val  -0.4284  (90s)
+    epoch 28  train NLL/event  -1.3218  val  -0.4343  (92s)
+    epoch 29  train NLL/event  -1.3411  val  -0.4368  (96s)
+    epoch 30  train NLL/event  -1.3651  val  -0.4364  (100s)
+    epoch 31  train NLL/event  -1.3382  val  -0.4309  (104s)
+    epoch 32  train NLL/event  -1.3357  val  -0.4338  (108s)
+    epoch 33  train NLL/event  -1.3345  val  -0.4448  (111s)
+    epoch 34  train NLL/event  -1.3366  val  -0.4415  (114s)
+    epoch 35  train NLL/event  -1.3401  val  -0.4384  (118s)
+    epoch 36  train NLL/event  -1.3544  val  -0.4423  (120s)
+    epoch 37  train NLL/event  -1.3358  val  -0.4362  (124s)
+    epoch 38  train NLL/event  -1.3442  val  -0.4351  (128s)
+    epoch 39  train NLL/event  -1.3534  val  -0.4315  (132s)
+MLP            0  -0.4448   +0.0012 [-0.0068, +0.0091]   +0.0012 [-0.0086, +0.0108]   +0.0012 [-0.0039, +0.0102]   0.0342/0.0233    40   max   132s
+MLP            1  -0.4382   -0.0053 [-0.0138, +0.0033]   -0.0053 [-0.0148, +0.0056]   -0.0053 [-0.0130, +0.0065]   0.0151/0.0376    30 early    88s
+MLP            2  -0.4407   -0.0028 [-0.0112, +0.0057]   -0.0028 [-0.0124, +0.0084]   -0.0028 [-0.0109, +0.0112]   0.0213/0.0279    36 early   118s
+MLP            3  -0.4338   -0.0097 [-0.0181, -0.0019]   -0.0097 [-0.0184, -0.0002]   -0.0097 [-0.0165, -0.0005]   0.0474/0.0354    28 early    88s
+MLP            4  -0.4399   -0.0036 [-0.0115, +0.0041]   -0.0036 [-0.0121, +0.0063]   -0.0036 [-0.0108, +0.0076]   0.0219/0.0271    40   max    74s
+MLP               -0.4395   seed s.d. of val NLL 0.0040   mean gain vs E1' -0.0040@60s  -0.0040@300s  -0.0040@900s
+C:\Users\iidab\OneDrive\Desktop\MicroFlux\.venv\Lib\site-packages\torch\nn\modules\transformer.py:533: UserWarning: The PyTorch API of nested tensors is in prototype stage and will change in the near future. We recommend specifying layout=torch.jagged when constructing a nested tensor, as this layout receives active development, has better operator coverage, and works with torch.compile. (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\aten\src\ATen\NestedTensorImpl.cpp:181.)
+  output = torch._nested_tensor_from_mask(
+    epoch  0  train NLL/event  -0.7180  val  -0.1652  (102s)
+    epoch  1  train NLL/event  -1.1469  val  -0.3192  (189s)
+    epoch  2  train NLL/event  -1.2713  val  -0.3880  (277s)
+    epoch  3  train NLL/event  -1.3113  val  -0.4083  (372s)
+    epoch  4  train NLL/event  -1.3448  val  -0.4047  (484s)
+    epoch  5  train NLL/event  -1.3262  val  -0.4339  (596s)
+    epoch  6  train NLL/event  -1.3531  val  -0.4358  (709s)
+    epoch  7  train NLL/event  -1.3552  val  -0.4489  (825s)
+    epoch  8  train NLL/event  -1.3598  val  -0.4429  (943s)
+    epoch  9  train NLL/event  -1.3715  val  -0.4551  (1055s)
+    epoch 10  train NLL/event  -1.3711  val  -0.4533  (1160s)
+    epoch 11  train NLL/event  -1.3690  val  -0.4457  (1278s)
+    epoch 12  train NLL/event  -1.3638  val  -0.4526  (1395s)
+    epoch 13  train NLL/event  -1.3550  val  -0.4492  (1514s)
+    epoch 14  train NLL/event  -1.3716  val  -0.4598  (1635s)
+    epoch 15  train NLL/event  -1.3530  val  -0.4648  (1758s)
+    epoch 16  train NLL/event  -1.3630  val  -0.4635  (1863s)
+    epoch 17  train NLL/event  -1.3817  val  -0.4623  (1982s)
+    epoch 18  train NLL/event  -1.3664  val  -0.4582  (2105s)
+    epoch 19  train NLL/event  -1.3719  val  -0.4622  (2229s)
+    epoch 20  train NLL/event  -1.3872  val  -0.4670  (2356s)
+    epoch 21  train NLL/event  -1.3931  val  -0.4610  (2483s)
+    epoch 22  train NLL/event  -1.3838  val  -0.4681  (2614s)
+    epoch 23  train NLL/event  -1.3615  val  -0.4539  (2723s)
+    epoch 24  train NLL/event  -1.3791  val  -0.4620  (2843s)
+    epoch 25  train NLL/event  -1.3706  val  -0.4644  (2967s)
+    epoch 26  train NLL/event  -1.3692  val  -0.4627  (3097s)
+    epoch 27  train NLL/event  -1.3707  val  -0.4630  (3230s)
+    epoch 28  train NLL/event  -1.3646  val  -0.4705  (3362s)
+    epoch 29  train NLL/event  -1.3858  val  -0.4706  (3487s)
+    epoch 30  train NLL/event  -1.4056  val  -0.4683  (3602s)
+    epoch 31  train NLL/event  -1.3805  val  -0.4656  (3730s)
+    epoch 32  train NLL/event  -1.3787  val  -0.4632  (3859s)
+    epoch 33  train NLL/event  -1.3771  val  -0.4720  (3989s)
+    epoch 34  train NLL/event  -1.3790  val  -0.4642  (4121s)
+    epoch 35  train NLL/event  -1.3816  val  -0.4639  (4255s)
+    epoch 36  train NLL/event  -1.3958  val  -0.4703  (4370s)
+    epoch 37  train NLL/event  -1.3790  val  -0.4626  (4459s)
+    epoch 38  train NLL/event  -1.3869  val  -0.4668  (4570s)
+    epoch 39  train NLL/event  -1.3971  val  -0.4590  (4677s)
+attention      0  -0.4720   +0.0284 [+0.0203, +0.0364]   +0.0284 [+0.0199, +0.0371]   +0.0284 [+0.0212, +0.0371]   0.0149/0.0225    40   max  4677s
+attention      1  -0.4647   +0.0212 [+0.0147, +0.0277]   +0.0212 [+0.0143, +0.0289]   +0.0212 [+0.0161, +0.0291]   0.0167/0.0271    22 early  1352s
+attention      2  -0.4710   +0.0275 [+0.0211, +0.0342]   +0.0275 [+0.0200, +0.0355]   +0.0275 [+0.0201, +0.0372]   0.0124/0.0306    30 early  1851s
+attention      3  -0.4680   +0.0245 [+0.0171, +0.0320]   +0.0245 [+0.0165, +0.0326]   +0.0245 [+0.0179, +0.0338]   0.0123/0.0269    28 early  1811s
+attention      4  -0.4703   +0.0268 [+0.0205, +0.0332]   +0.0268 [+0.0208, +0.0333]   +0.0268 [+0.0207, +0.0342]   0.0131/0.0225    25 early  1564s
+attention         -0.4692   seed s.d. of val NLL 0.0029   mean gain vs E1' +0.0257@60s  +0.0257@300s  +0.0257@900s
+
+attention vs MLP, paired on blocks within each seed:
+ seed                         60 s                        300 s                        900 s
+    0   +0.0272 [+0.0196, +0.0355]   +0.0272 [+0.0207, +0.0337]   +0.0272 [+0.0212, +0.0343]
+    1   +0.0265 [+0.0188, +0.0342]   +0.0265 [+0.0200, +0.0330]   +0.0265 [+0.0212, +0.0325]
+    2   +0.0303 [+0.0222, +0.0386]   +0.0303 [+0.0228, +0.0379]   +0.0303 [+0.0238, +0.0379]
+    3   +0.0342 [+0.0263, +0.0429]   +0.0342 [+0.0279, +0.0404]   +0.0342 [+0.0296, +0.0413]
+    4   +0.0305 [+0.0235, +0.0375]   +0.0305 [+0.0240, +0.0364]   +0.0305 [+0.0244, +0.0360]
+ mean   +0.0297   seed s.d. 0.0031
+
+artifacts: runs\BTCUSDT-2026-09-09
+RERUN DONE
