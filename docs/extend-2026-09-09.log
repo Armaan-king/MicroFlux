@@ -1,0 +1,25 @@
+model              val NLL/event    gain over benchmark         95% CI, 60 s                300 s                900 s    val KS BUY    SELL     resid mean by hour (BUY)
+benchmark  x5            -0.4396                +0.0000   [+0.0000, +0.0000]   [+0.0000, +0.0000]   [+0.0000, +0.0000]        0.0418  0.0611      1.040    1.100    1.120   (80s)
+E1  x7 slow              -0.4407                +0.0011   [+0.0007, +0.0015]   [+0.0007, +0.0015]   [+0.0006, +0.0018]        0.0420  0.0609      1.043    1.100    1.114   (162s)
+E2  x10 dense            -0.4403                +0.0008   [+0.0000, +0.0015]   [+0.0001, +0.0016]   [+0.0003, +0.0013]        0.0422  0.0611      1.040    1.100    1.119   (562s)
+E1+E2  x12               -0.4410                +0.0014   [+0.0006, +0.0023]   [+0.0006, +0.0024]   [+0.0007, +0.0022]        0.0419  0.0608      1.046    1.101    1.110   (450s)
+E1' x7 no blocks         -0.4435                +0.0039   [+0.0025, +0.0055]   [+0.0030, +0.0050]   [+0.0032, +0.0049]        0.0378  0.0608      1.036    1.069    1.076   (189s)
+
+decomposition of the predicted validation count   (observed | baseline + excitation = predicted)
+model                BUY obs     base    excit     pred     SELL obs     base    excit     pred   
+benchmark  x5           7573     2241     5954     8195         6087     2209     4482     6691   
+E1  x7 slow             7573     1919     6270     8189         6087     1873     4699     6572   
+E2  x10 dense           7573     2277     5916     8193         6087     2167     4494     6661   
+E1+E2  x12              7573     1778     6414     8191         6087     1932     4653     6584   
+E1' x7 no blocks        7573     1492     6520     8012         6087     1268     4954     6222   
+
+[E1  x7 slow] branching at the slow scales  (row = excited, col = exciting side, summed over state and mark)
+      500s  BUY<-BUY 0.0544  BUY<-SELL 0.1053  SELL<-BUY 0.3483  SELL<-SELL 0.0153
+     5000s  BUY<-BUY 0.1341  BUY<-SELL 0.2416  SELL<-BUY 0.0443  SELL<-SELL 0.0398
+   baseline mu (train-mean per state, BUY): 0.289  0.417  0.709 /s
+
+[E1' x7 no blocks] branching at the slow scales  (row = excited, col = exciting side, summed over state and mark)
+      500s  BUY<-BUY 0.3990  BUY<-SELL 0.1197  SELL<-BUY 0.0013  SELL<-SELL 0.5517
+     5000s  BUY<-BUY 0.4638  BUY<-SELL 0.0612  SELL<-BUY 0.0009  SELL<-SELL 0.0015
+   baseline mu (train-mean per state, BUY): 0.207  0.333  0.563 /s
+EXTEND DONE

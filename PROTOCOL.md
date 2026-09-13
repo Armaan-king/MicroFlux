@@ -85,4 +85,5 @@ Extended-input runs report the gain over the matched-input run of the same archi
 - **2026-09-13** — frozen after the diagnostics pass on 2026-09-09 (ARCHITECTURE.md D9–D10).
 - **2026-09-13** — E1 and E2 run on the exploratory session (D11): H7 refuted for E1, H8 not confirmed. E1′ and H9 added; apply to fresh sessions only.
 - **2026-09-13** — E1′ run on the exploratory session (D12): gain +0.0039 with all three block sizes excluding zero; residual drift reduced, not removed. H9 partially met; stands for fresh sessions.
+- **2026-09-13** — neural pilot on the exploratory session (D13): summaries-MLP −0.0020 ± 0.0034 vs E1′; attention N = 64 +0.0164 ± 0.0084, 3/3 seeds clear zero; N = 128 no different. Fresh-session neural runs use N = 64, patience 8, an epoch floor, 5 seeds.
 - **2026-09-13** — test isolation fixed: `evaluate` scored KS on test in every validation script; now validation by default. §7 comparator list includes E1′ and retained combinations; block-size sensitivity and training seeds added.

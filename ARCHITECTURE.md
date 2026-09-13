@@ -558,6 +558,29 @@ The observed count is more than three times the baseline alone. A lower intensit
 
 ---
 
+### D13 — Neural pilot: event history beats activity summaries; summaries alone do not beat E1′ (2026-09-13)
+
+**Design.** Two encoders on one intensity head, one likelihood, matched categorical inputs (side, mark class, state). Head: `λ_i(τ) = Σ_ℓ [b_iℓ + (a_iℓ − b_iℓ) e^{−β_ℓ τ}]` with the five benchmark decays, `a, b > 0` from the encoder and the latest causally available state, integrated exactly piece by piece across book rows inside each inter-event interval. Encoders: an MLP over causal activity counts per side at 1 s, 10 s, 60 s, 300 s, 1800 s plus 20+ fill counts at 1 s and 10 s, plus the last event; and a 2-layer, 4-head, width-64 transformer over the last N event tokens (side, mark, state, log gap, log age) with the same summaries. Likelihood on the same events and half-open windows as `hawkes.loglik` (`tests/test_neural.py`: Poisson equals the head with a = b to 1e-5). Adam, 40k training events per epoch, early stopping on validation, three seeds, float32, CPU.
+
+**Validation gains over E1′ (the best classical model on this session), 95% block-bootstrap intervals at 60 s; 300 s and 900 s agree throughout:**
+
+```
+                        seed 0                  seed 1                  seed 2                  mean ± sd
+MLP (summaries)        −0.0023 [−.010, +.005]  −0.0052 [−.013, +.003]  +0.0014 [−.006, +.009]  −0.0020 ± 0.0034
+attention N = 64       +0.0246 [+.018, +.032]  +0.0078 [+.001, +.015]  +0.0169 [+.010, +.024]  +0.0164 ± 0.0084
+attention N = 128      +0.0023 [−.005, +.010]  +0.0246 [+.018, +.032]  +0.0186 [+.012, +.025]  +0.0151 ± 0.0115
+```
+
+Validation KS (jittered): E1′ 0.039 / 0.044; attention 0.014–0.030 / 0.022–0.037.
+
+**Reading.** (1) Compact activity summaries do not explain the remaining error: the MLP is indistinguishable from E1′ on every seed. (2) The last 64 event tokens do: every N = 64 seed clears zero at every block size; N = 128 adds nothing over N = 64 within seed noise. (3) The best runs of both horizons land at the same −0.4681 (+0.0246), and the weaker seeds stopped at epochs 11–12 — the spread across seeds (sd ≈ 0.01, comparable to the mean) is optimisation variability, not a property of the data, and the pilot's early stopping is too impatient. (4) Runtime: 12–52 min per seed on CPU.
+
+**What this is and is not.** A predictive gain of roughly +0.01 to +0.025 NLL/event over the best classical model, from access to the identity, mark, state and timing of individual recent events rather than their counts. It is one session, validation only, three seeds. It is not a mechanism, and it is not yet a claim: `PROTOCOL.md` §7 requires the direction to replicate on ≥ 2 fresh sessions before it enters the analysis.
+
+**Consequences.** (1) N = 64 is the pilot default; 256 and 512 are not worth their cost until N = 128 shows something N = 64 does not. (2) Before fresh-session evaluation: patience 8, a fixed epoch floor, and 5 seeds, so the seed spread reflects the model rather than the stopping rule. (3) The next two experiments in the brief — continuous marks, then richer book features — are run against this attention model with the same head, each reported as its own increment. (4) The test segment of 2026-09-09 remains untouched by every neural model.
+
+---
+
 # Open Decisions
 
 Major unresolved questions currently include:

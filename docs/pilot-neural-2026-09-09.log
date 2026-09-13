@@ -1,0 +1,95 @@
+147,216 orders   train < 5.60h   val [5.60h, 6.80h) n=13,660   threads=22
+  M4         val NLL/event  -0.4396   val KS 0.0432 / 0.0450   (95s)
+  E1'        val NLL/event  -0.4435   val KS 0.0385 / 0.0439   (221s)
+  reference = E1'
+
+model            seed  val NLL   gain vs E1'              CI 60 s                300 s                900 s          val KS   epochs    time
+    epoch  0  train NLL/event  -0.6561  val  -0.1141  (2s)
+    epoch  1  train NLL/event  -1.0212  val  -0.1955  (4s)
+    epoch  2  train NLL/event  -1.1110  val  -0.2780  (6s)
+    epoch  3  train NLL/event  -1.1615  val  -0.3152  (8s)
+    epoch  4  train NLL/event  -1.2346  val  -0.3559  (10s)
+    epoch  5  train NLL/event  -1.2449  val  -0.3746  (12s)
+    epoch  6  train NLL/event  -1.2852  val  -0.3870  (14s)
+    epoch  7  train NLL/event  -1.2897  val  -0.3998  (16s)
+    epoch  8  train NLL/event  -1.3011  val  -0.3994  (18s)
+    epoch  9  train NLL/event  -1.3036  val  -0.3877  (20s)
+    epoch 10  train NLL/event  -1.2941  val  -0.4108  (22s)
+    epoch 11  train NLL/event  -1.2908  val  -0.4172  (24s)
+    epoch 12  train NLL/event  -1.3127  val  -0.4035  (26s)
+    epoch 13  train NLL/event  -1.3206  val  -0.4133  (28s)
+    epoch 14  train NLL/event  -1.3258  val  -0.4041  (30s)
+    epoch 15  train NLL/event  -1.3050  val  -0.4251  (32s)
+    epoch 16  train NLL/event  -1.3282  val  -0.4211  (34s)
+    epoch 17  train NLL/event  -1.3397  val  -0.4291  (36s)
+    epoch 18  train NLL/event  -1.3249  val  -0.4125  (37s)
+    epoch 19  train NLL/event  -1.3135  val  -0.4292  (39s)
+    epoch 20  train NLL/event  -1.3481  val  -0.4301  (41s)
+    epoch 21  train NLL/event  -1.3519  val  -0.4274  (43s)
+    epoch 22  train NLL/event  -1.3369  val  -0.4244  (45s)
+    epoch 23  train NLL/event  -1.3051  val  -0.4338  (47s)
+    epoch 24  train NLL/event  -1.3218  val  -0.4371  (49s)
+    epoch 25  train NLL/event  -1.3336  val  -0.4337  (51s)
+    epoch 26  train NLL/event  -1.3386  val  -0.4320  (53s)
+    epoch 27  train NLL/event  -1.3233  val  -0.4354  (55s)
+    epoch 28  train NLL/event  -1.3285  val  -0.4412  (57s)
+    epoch 29  train NLL/event  -1.3238  val  -0.4253  (59s)
+    epoch 30  train NLL/event  -1.3500  val  -0.4277  (61s)
+    epoch 31  train NLL/event  -1.3423  val  -0.4333  (63s)
+    epoch 32  train NLL/event  -1.3401  val  -0.4383  (65s)
+MLP                 0  -0.4412       -0.0023   [-0.0102, +0.0052]   [-0.0111, +0.0063]   [-0.0093, +0.0078]   0.0277/0.0247       33     65s
+MLP                 1  -0.4383       -0.0052   [-0.0133, +0.0027]   [-0.0145, +0.0046]   [-0.0115, +0.0046]   0.0180/0.0320       26     49s
+MLP                 2  -0.4449       +0.0014   [-0.0063, +0.0091]   [-0.0078, +0.0119]   [-0.0060, +0.0136]   0.0259/0.0308       36     67s
+MLP              mean                -0.0020   sd 0.0034
+C:\Users\iidab\OneDrive\Desktop\MicroFlux\.venv\Lib\site-packages\torch\nn\modules\transformer.py:533: UserWarning: The PyTorch API of nested tensors is in prototype stage and will change in the near future. We recommend specifying layout=torch.jagged when constructing a nested tensor, as this layout receives active development, has better operator coverage, and works with torch.compile. (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\aten\src\ATen\NestedTensorImpl.cpp:181.)
+  output = torch._nested_tensor_from_mask(
+    epoch  0  train NLL/event  -0.7158  val  -0.1746  (64s)
+    epoch  1  train NLL/event  -1.1625  val  -0.3383  (127s)
+    epoch  2  train NLL/event  -1.2795  val  -0.3667  (190s)
+    epoch  3  train NLL/event  -1.3038  val  -0.4118  (254s)
+    epoch  4  train NLL/event  -1.3415  val  -0.4216  (317s)
+    epoch  5  train NLL/event  -1.3283  val  -0.4248  (381s)
+    epoch  6  train NLL/event  -1.3548  val  -0.4361  (446s)
+    epoch  7  train NLL/event  -1.3506  val  -0.4460  (511s)
+    epoch  8  train NLL/event  -1.3608  val  -0.4424  (577s)
+    epoch  9  train NLL/event  -1.3588  val  -0.4348  (642s)
+    epoch 10  train NLL/event  -1.3431  val  -0.4432  (707s)
+    epoch 11  train NLL/event  -1.3407  val  -0.4466  (774s)
+    epoch 12  train NLL/event  -1.3602  val  -0.4480  (838s)
+    epoch 13  train NLL/event  -1.3694  val  -0.4545  (904s)
+    epoch 14  train NLL/event  -1.3729  val  -0.4613  (970s)
+    epoch 15  train NLL/event  -1.3514  val  -0.4607  (1035s)
+    epoch 16  train NLL/event  -1.3727  val  -0.4573  (1100s)
+    epoch 17  train NLL/event  -1.3802  val  -0.4620  (1167s)
+    epoch 18  train NLL/event  -1.3710  val  -0.4616  (1234s)
+    epoch 19  train NLL/event  -1.3582  val  -0.4574  (1302s)
+    epoch 20  train NLL/event  -1.3917  val  -0.4681  (1369s)
+    epoch 21  train NLL/event  -1.3941  val  -0.4645  (1436s)
+    epoch 22  train NLL/event  -1.3809  val  -0.4650  (1505s)
+    epoch 23  train NLL/event  -1.3487  val  -0.4653  (1573s)
+    epoch 24  train NLL/event  -1.3643  val  -0.4623  (1641s)
+attention N=64      0  -0.4681       +0.0246   [+0.0178, +0.0318]   [+0.0162, +0.0338]   [+0.0166, +0.0360]   0.0213/0.0369       25   1641s
+attention N=64      1  -0.4513       +0.0078   [+0.0005, +0.0152]   [+0.0012, +0.0136]   [+0.0027, +0.0141]   0.0144/0.0268       11    712s
+attention N=64      2  -0.4604       +0.0169   [+0.0102, +0.0238]   [+0.0100, +0.0247]   [+0.0111, +0.0253]   0.0208/0.0249       16   1024s
+attention N=64   mean                +0.0164   sd 0.0084
+    epoch  0  train NLL/event  -0.7115  val  -0.1749  (128s)
+    epoch  1  train NLL/event  -1.1602  val  -0.3271  (255s)
+    epoch  2  train NLL/event  -1.2745  val  -0.3558  (381s)
+    epoch  3  train NLL/event  -1.3010  val  -0.4058  (511s)
+    epoch  4  train NLL/event  -1.3404  val  -0.4221  (639s)
+    epoch  5  train NLL/event  -1.3263  val  -0.4248  (768s)
+    epoch  6  train NLL/event  -1.3534  val  -0.4333  (898s)
+    epoch  7  train NLL/event  -1.3483  val  -0.4458  (1028s)
+    epoch  8  train NLL/event  -1.3586  val  -0.4409  (1157s)
+    epoch  9  train NLL/event  -1.3548  val  -0.4373  (1285s)
+    epoch 10  train NLL/event  -1.3417  val  -0.4414  (1415s)
+    epoch 11  train NLL/event  -1.3387  val  -0.4431  (1544s)
+attention N=128     0  -0.4458       +0.0023   [-0.0054, +0.0103]   [-0.0075, +0.0108]   [-0.0055, +0.0115]   0.0377/0.0497       12   1544s
+attention N=128     1  -0.4681       +0.0246   [+0.0176, +0.0315]   [+0.0163, +0.0327]   [+0.0189, +0.0330]   0.0254/0.0240       24   3126s
+attention N=128     2  -0.4621       +0.0186   [+0.0120, +0.0254]   [+0.0108, +0.0272]   [+0.0116, +0.0292]   0.0302/0.0224       16   2091s
+attention N=128  mean                +0.0151   sd 0.0115
+
+attention minus MLP, mean over seeds:
+   attention N=64   +0.0185
+   attention N=128  +0.0172
+NEURAL DONE
