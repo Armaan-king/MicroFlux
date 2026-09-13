@@ -16,6 +16,7 @@ MicroFlux owns the **research, modelling, training, and evaluation layer**.
 |---|---|---|
 | `GOAL.md` | **Stable** | Research intent, scope boundaries, success criteria. Changes rarely and deliberately. |
 | `ARCHITECTURE.md` | **Flexible / living** | How the project is currently built. |
+| `PROTOCOL.md` | **Frozen** | What is computed on a fresh session, the controls, the pre-registered hypotheses. Changes are logged and apply only forward. |
 | `CLAUDE.md` / `AGENTS.md` | Working notes | Instructions for AI coding agents. |
 
 **`ARCHITECTURE.md` is explicitly a flexible document.**

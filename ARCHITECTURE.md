@@ -124,7 +124,10 @@ src/microflux/
 explore.py          Stage 1 measurements
 fit.py              Stage 2 six-model ladder
 fit_state.py        Stage 3 state-dependent excitation, with time-shift control
-fit_marks.py        Stage 3b marked excitation by fill count, with shuffle control
+fit_marks.py        Stage 3b marked excitation by fill count, with CIs and within-split shuffle control
+audit_marks.py      what the mark measures; grouping-rule sensitivity
+diagnose.py         residual diagnostics on validation, calibrated against a simulated null
+fit_extend.py       pre-registered classical extensions E1 / E2
 tests/              recovery-from-known-truth tests
 data/               replayed book cache (gitignored)
 ```
@@ -499,6 +502,39 @@ Excitation from **5+ fill orders concentrates at the 5–50 ms scales** with lit
 **Artifact check.** A sweep crossing a millisecond boundary would be split by `collapse_trades` into two orders 1 ms apart and masquerade as fast excitation. Measured: after a 20+ order, a same-side order follows at exactly +1 ms 21% of the time and at +2 ms 18% — a smooth decay, not a spike — and the +1 ms / (+2..5 ms) ratio is *lowest* for the 20+ class (2.65 vs 3.36 for single fills). Not splitting.
 
 **Consequences.** (1) Every propagation claim must condition on mark; unmarked kernels average over it. (2) The working model is `Hawkes x5 + μ(t,s) + k(s,c)`: 378 parameters, J = 24, 81 s to fit, test NLL −0.256, KS 0.055 / 0.059. (3) Quantity (BTC) is a second candidate mark, correlated 0.53 with fills. (4) Still one session.
+
+---
+
+### D10 — Diagnostics calibrated against a simulated null; protocol frozen (2026-09-13)
+
+**Decision.** Every goodness-of-fit statistic is reported next to a null: the fitted model simulated on the real state function with train mark frequencies, passed through the observation process (`simulate.observe`: ms ticks, same-tick same-side merge), refitted, and diagnosed identically. Residual times are jittered within their tick (`residuals.jitter`, the discrete time-rescaling correction). Conditional residual means condition **only on features of the event that opened the interval** — the arriving event's mark or state is end-of-interval information and would select waiting times even under a correct model. Held-out gains carry 95% block-bootstrap intervals (60 s blocks). Controls shuffle marks within (split, side) over five seeds. The 2026-09-09 test segment is **exploratory**; `PROTOCOL.md` fixes what will be computed on fresh sessions.
+
+**What the null established.** The diagnostics are unbiased (every simulated bin 1.00 ± s.e., autocorrelation ≈ 0). Under a correct model the 1% residual quantile is inflated **2.6–2.8×** and the KS floor is **0.028** — both from the observation process. Without calibration the low-quantile excess on real data would have been misread as a short-lag misfit.
+
+**What is left, on validation (M4).**
+- Residual mean ≈ 1.10 across every bin, rising 1.04 → 1.12 through the window: the train-mean baseline **over-predicts a quieter period**. Rate tracking, not kernel shape. Dominant.
+- Autocorrelation 0.08–0.10 at lags 1–2, gone by lag 50 (null ≈ 0): unmodelled clustering at 0.2–2 s.
+- Openers with no events in the prior 100 ms: 1.15 / 1.24; with 2–4 events: 0.97 / 0.89. Quiet contexts over-predicted, moderately busy under-predicted. Consistent with the two above.
+- **No saturation** (10+ event bursts within 2 s.e. of null) and **no opposite-side inhibition** (opposite-side gap bins flat). The two things a Hawkes structurally cannot represent are not indicated.
+- Mark and state residual patterns are within ±0.05 of the offset: largely captured.
+
+**Validation gains with intervals.** Marks +0.1515 [+0.140, +0.164]; state +0.0182 [+0.014, +0.023]; both +0.1585 [+0.149, +0.169]; shuffled-mark control −0.0008 ± 0.0023 (5 seeds).
+
+**Mark audit.** `fills` counts trade rows in a same-ms same-side run; 91% of 2–4 fill orders touched one price. Merging same-side runs 1 ms apart removes 13% of orders, keeps the pattern, and lowers the 5 ms excitation of 20+ orders 0.88 → 0.64 — that fraction of the fastest component is indistinguishable from same-order continuation. Distinct price levels as the mark: +0.094, less informative than fills.
+
+**Consequences.** (1) Pre-registered classical extensions E1 (slow scales, rate tracking) and E2 (dense grid) target the two residuals found; results in D11. (2) The neural design brief (`docs/ml-design-brief.md`) is written so that any neural gain is attributable to kernel shape, interactions, inputs, or memory separately. (3) Confirmatory claims wait for fresh sessions under `PROTOCOL.md`.
+
+---
+
+### D11 — The classical extensions do not reach the residual; the baseline cannot go down (2026-09-13)
+
+**Result (validation, exploratory session).** Gains over M4 with 95% intervals: **E1** (+500 s, +5000 s scales) +0.0011 [+0.0007, +0.0015]; **E2** (ten half-decade scales) +0.0008 [+0.0000, +0.0015]; E1+E2 +0.0014. KS 0.055 → 0.053. The residual mean by hour is **unchanged**: 1.04 / 1.10 / 1.12 under every grid. H7 refuted for E1 as registered; H8 not confirmed.
+
+**Why E1 cannot work.** Excitation is non-negative. A Hawkes intensity is `μ_frozen + Σ(positive kernels) ≥ μ_frozen`; on a held-out window quieter than the training mean, no kernel of any timescale can bring the intensity *down* to the observed rate. The over-prediction is a property of the additive-positive structure with a frozen baseline, not of the scale grid. The slow scales fitted on train are small (branching 0.05–0.35) because the 15-minute blocks already absorb the level there; out of sample they have nothing to track with.
+
+**What is left, restated.** Above the observation floor (KS 0.028), the working model leaves ≈ 0.025 of KS and a ~10% over-prediction on the quieter window, plus short-lag residual autocorrelation that E2 shows is not a matter of kernel resolution. Both point at the same missing capability: **intensity that can fall below the exogenous level as a function of recent history.** Two families have it — an excitation-carried baseline with no time blocks (E1′: slow scales, single μ, so recent activity *is* the level), and any model whose history representation can lower the intensity (`docs/ml-design-brief.md` N2). Neither is run in this pass; E1′ is the next pre-registration.
+
+**Consequences.** (1) The benchmark for the neural comparison stays M4 — the extensions do not earn their parameters. (2) The neural design brief is sharpened: not "interactions" in the abstract, but whether letting history lower the intensity explains the remaining residual. (3) Slow cross-side branching in E1 (SELL←BUY 0.35 at 500 s) is small in likelihood terms and is treated as drift absorption until a fresh session says otherwise.
 
 ---
 

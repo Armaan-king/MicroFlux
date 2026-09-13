@@ -9,7 +9,7 @@ import polars as pl
 
 from microflux.book import replay
 from microflux.events import Events
-from microflux.hawkes import Params, loglik
+from microflux.hawkes import Params, compensator, intensity, loglik
 from microflux.residuals import ks_exp1, rescaled_residuals
 from microflux.load import collapse_trades, load_stream, partition
 
@@ -81,3 +81,57 @@ def matrix(title: str, M: np.ndarray, cols: tuple[str, ...] = TYPES, fmt: str = 
     print(f"{'':>8}" + "".join(f"{'<-' + c:>10}" for c in cols))
     for i, row in enumerate(M):
         print(f"{TYPES[i]:>8}" + "".join(fmt.format(v) for v in row))
+
+
+# --- uncertainty and controls -----------------------------------------------
+
+
+def block_loglik(p: Params, ev: Events, a: float, b: float, block_s: float) -> tuple[np.ndarray, np.ndarray]:
+    """Log-likelihood and event count per consecutive block of `block_s`
+    seconds over [a, b). Blocks are the resampling unit: events within a
+    block are dependent, blocks far apart are close to independent."""
+    lam = intensity(p, ev)
+    own = np.log(lam[np.arange(len(ev)), ev.m])
+    edges = np.append(np.arange(a, b, block_s), b)
+    ll, n = np.zeros(len(edges) - 1), np.zeros(len(edges) - 1)
+    for k, (lo, hi) in enumerate(zip(edges[:-1], edges[1:])):
+        inside = ev.window(lo, hi)
+        ll[k] = own[inside].sum() - compensator(p, ev, lo, hi).sum()
+        n[k] = inside.sum()
+    return ll, n
+
+
+def gain_ci(p_ref: Params, p_new: Params, ev_ref: Events, ev_new: Events, a: float, b: float,
+            block_s: float = 60.0, n_boot: int = 2000, seed: int = 0) -> tuple[float, float, float]:
+    """Held-out NLL/event gain of `p_new` over `p_ref` with a 95% block-bootstrap interval.
+
+    Both models are scored on the same time blocks; the per-block difference
+    is resampled with replacement. Returns (gain, lo, hi).
+    """
+    ll_r, n = block_loglik(p_ref, ev_ref, a, b, block_s)
+    ll_n, _ = block_loglik(p_new, ev_new, a, b, block_s)
+    d = ll_n - ll_r
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, len(d), (n_boot, len(d)))
+    boot = d[idx].sum(1) / n[idx].sum(1)
+    return float(d.sum() / n.sum()), float(np.quantile(boot, 0.025)), float(np.quantile(boot, 0.975))
+
+
+def shuffle_within(x: np.ndarray, groups: np.ndarray, seed: int) -> np.ndarray:
+    """`x` permuted separately inside each group. For a mark control the
+    group is (split, side): the label loses its timing but keeps its split
+    and its side-conditional distribution."""
+    rng = np.random.default_rng(seed)
+    out = x.copy()
+    for g in np.unique(groups):
+        k = np.flatnonzero(groups == g)
+        out[k] = x[rng.permutation(k)]
+    return out
+
+
+def split_id(t: np.ndarray, split: dict[str, tuple[float, float]]) -> np.ndarray:
+    """0 / 1 / 2 for train / val / test."""
+    out = np.zeros(len(t), np.int64)
+    for k, (_, (a, b)) in enumerate(split.items()):
+        out[(t >= a) & (t < b)] = k
+    return out
