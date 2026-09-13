@@ -11,7 +11,7 @@ from microflux.book import replay
 from microflux.events import Events
 from microflux.hawkes import Params, compensator, intensity, loglik
 from microflux.residuals import ks_exp1, rescaled_residuals
-from microflux.load import collapse_trades, load_stream, partition
+from microflux.load import collapse_trades, is_continuous, load_stream, partition, session_files
 
 TYPES = ("BUY", "SELL")
 HALF_LIVES = np.array([0.005, 0.05, 0.5, 5.0, 50.0])  # seconds; one decade apart
@@ -159,3 +159,20 @@ def split_id(t: np.ndarray, split: dict[str, tuple[float, float]]) -> np.ndarray
     for k, (_, (a, b)) in enumerate(split.items()):
         out[(t >= a) & (t < b)] = k
     return out
+
+
+# --- session eligibility (PROTOCOL.md s.1b) --------------------------------------
+
+
+def session_eligibility(root: str, symbol: str, date: str) -> dict:
+    """Facts the protocol gates on: continuity, snapshot, span, order count."""
+    d = partition(root, symbol, date)
+    book = load_stream(d, "book_updates")
+    orders = collapse_trades(load_stream(d, "trades"))
+    snaps = load_stream(d, "snapshots").height if any("snapshots" in v for v in session_files(d).values()) else 0
+    span_h = (orders["timestamp_ns"][-1] - orders["timestamp_ns"][0]) / 3.6e12
+    facts = {"continuous": bool(is_continuous(book)), "snapshots": int(snaps), "span_hours": float(span_h),
+             "orders": int(orders.height), "book_rows": int(book.height),
+             "first_ns": int(orders["timestamp_ns"][0]), "last_ns": int(orders["timestamp_ns"][-1])}
+    facts["eligible"] = facts["continuous"] and facts["snapshots"] >= 1 and facts["span_hours"] >= 1.0 and facts["orders"] >= 10_000
+    return facts
