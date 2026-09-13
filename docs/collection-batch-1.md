@@ -18,8 +18,12 @@ From the TickForge repository, in PowerShell:
 
 ```powershell
 cd C:\Users\iidab\OneDrive\Desktop\TickForge
-powershell -File scripts\run_capture.ps1 -Hours 8
+powershell -File scripts\run_capture.ps1 -Hours 8.5
 ```
+
+`-Hours 8.5` rather than 8: the batch rule is >= 8 h of *usable* span between the
+first and last order, and the first seconds go to the snapshot seed. The
+half-hour is margin, nothing else.
 
 That is the script the 2026-09-09 session was captured with. Defaults it uses
 and that must not change: `-Symbol BTCUSDT`, `-Root C:\tickforge-runs`,
@@ -29,10 +33,19 @@ must stay on mains power and connected. The output partition is
 `C:\tickforge-runs\binance\BTCUSDT\<UTC date>\`.
 
 **Timing constraint.** TickForge partitions by the UTC date of each event and
-rolls the partition at midnight UTC. For 8 hours to land in one partition the
-capture must **start between 00:00 and 16:00 UTC** (05:30–21:30 IST). A
-capture that straddles midnight yields two partitions, each shorter than 8 h;
-each would be judged separately and would likely fail the span rule.
+rolls the partition at midnight UTC. For 8.5 hours to land in one partition
+the capture must **start between 00:00 and 15:00 UTC**. The laptop is on
+Eastern time (EDT = UTC - 4), so that is **20:00 the previous evening to
+11:00 local**. A capture that straddles midnight UTC yields two partitions,
+each shorter than 8 h; each would be judged separately and would fail the
+span rule.
+
+**Schedule.** Recorded 2026-09-13 20:54 UTC; today's partition has too little
+left. Capture 1: UTC date **2026-09-14**, start between 20:00 EDT on the 13th
+and 11:00 EDT on the 14th. Capture 2: UTC date **2026-09-15**, same window one
+day later. The launching PowerShell window holds the sleep suppression for
+the whole run, so each capture is started by hand in its own window and that
+window stays open until the script prints "sleep suppression released".
 
 Run the two captures on different UTC dates. Do not start a capture on a date
 that already has a partition in `C:\tickforge-runs\binance\BTCUSDT\`.
@@ -47,8 +60,15 @@ next capture is taken. It is not re-captured on a chosen date.
 ## What is computed, per session, in this order
 
 ```
-python run_session.py --date <UTC date>
+python run_session.py --date <UTC date> --batch docs/collection-batch-1.json
 ```
+
+The batch file enforces >= 8 h, distinct UTC dates, no overlap with and no
+duplicate of any evaluated data (recognised by fingerprint, not folder name),
+capture order, and the batch size; the general one-hour eligibility and the
+two-hour session's standing are unchanged (`src/microflux/batch.py`,
+`tests/test_batch.py`). Excluded captures and their reasons are recorded in
+the batch file.
 
 1. `replicate.py` — the registered classical ladder (M0–M4, M4 without kernel
    state, E1, E2, E1′), paired gains at 60 / 300 / 900 s, mark-shuffle and

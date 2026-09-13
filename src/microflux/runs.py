@@ -16,7 +16,6 @@ One directory per (session, model, seed):
                           recomputed without the model
 """
 
-import hashlib
 import json
 import subprocess
 import sys
@@ -25,6 +24,8 @@ from pathlib import Path
 
 import numpy as np
 import torch
+
+from microflux.batch import fingerprint
 
 
 def code_revision(root: Path) -> str:
@@ -40,7 +41,7 @@ def data_identity(root: str, symbol: str, date: str, t_ns: np.ndarray, split: di
     return {
         "root": root, "symbol": symbol, "date": date, "orders": int(len(t_ns)),
         "first_ns": int(t_ns[0]), "last_ns": int(t_ns[-1]),
-        "fingerprint": hashlib.sha256(np.ascontiguousarray(t_ns).tobytes()).hexdigest()[:16],
+        "fingerprint": fingerprint(t_ns),
         "split": {k: [float(a), float(b)] for k, (a, b) in split.items()},
     }
 

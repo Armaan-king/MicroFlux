@@ -1,0 +1,11 @@
+{
+  "name": "batch-1",
+  "recorded": "2026-09-13",
+  "symbol": "BTCUSDT",
+  "sessions_required": 2,
+  "min_hours": 8.0,
+  "capture": "powershell -File scripts\\run_capture.ps1 -Hours 8.5  (TickForge repo; defaults unchanged)",
+  "start_window_utc": "00:00-15:00 on the target UTC date",
+  "sessions": [],
+  "excluded": []
+}

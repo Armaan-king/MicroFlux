@@ -171,8 +171,10 @@ def session_eligibility(root: str, symbol: str, date: str) -> dict:
     orders = collapse_trades(load_stream(d, "trades"))
     snaps = load_stream(d, "snapshots").height if any("snapshots" in v for v in session_files(d).values()) else 0
     span_h = (orders["timestamp_ns"][-1] - orders["timestamp_ns"][0]) / 3.6e12
+    from microflux.batch import fingerprint
     facts = {"continuous": bool(is_continuous(book)), "snapshots": int(snaps), "span_hours": float(span_h),
              "orders": int(orders.height), "book_rows": int(book.height),
-             "first_ns": int(orders["timestamp_ns"][0]), "last_ns": int(orders["timestamp_ns"][-1])}
+             "first_ns": int(orders["timestamp_ns"][0]), "last_ns": int(orders["timestamp_ns"][-1]),
+             "fingerprint": fingerprint(orders["timestamp_ns"].to_numpy())}
     facts["eligible"] = facts["continuous"] and facts["snapshots"] >= 1 and facts["span_hours"] >= 1.0 and facts["orders"] >= 10_000
     return facts
