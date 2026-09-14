@@ -19,3 +19,5 @@ wandb/
 mlruns/
 .venv/
 runs/**/*.pt
+runs/**/run.log.stdout
+runs/**/run.err
