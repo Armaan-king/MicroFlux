@@ -99,3 +99,4 @@ Extended-input runs report the gain over the matched-input run of the same archi
 - **2026-09-13** — test isolation fixed: `evaluate` scored KS on test in every validation script; now validation by default. §7 comparator list includes E1′ and retained combinations; block-size sensitivity and training seeds added.
 - **2026-09-13** — final test scored once on `BTCUSDT-2026-09-09-early` (runs/BTCUSDT-2026-09-09-early/final_test.json).
 - **2026-09-14** — final test scored once on `BTCUSDT-2026-09-14` (runs/BTCUSDT-2026-09-14/final_test.json).
+- **2026-09-15** — batch session 1 `BTCUSDT-2026-09-14` (D15): H1, H2, H5, H8 confirmed; attention +0.0278 on validation and **+0.0339 on the final test**, 5/5 seeds clear at 77 / 16 / 6 blocks; MLP +0.0076 / +0.0037. Batch conclusion pending session 2.

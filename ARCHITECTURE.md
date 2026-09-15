@@ -132,7 +132,8 @@ scripts/
 ├── fit_neural.py   Stage 4: summary MLP vs attention on a shared multiscale head, 5 seeds, artifacts per run
 ├── replicate.py    registered classical ladder, controls, diagnostics, H1-H9 on one session
 ├── final_test.py   the one-time test-segment score for a session
-└── run_session.py  eligibility gate -> replicate -> fit_neural -> final_test, each stage once
+├── run_session.py  eligibility gate -> replicate -> fit_neural -> final_test, each stage once
+└── run_detached.ps1  the same, detached from the shell and keeping the machine awake, with logs
 notebooks/          01_neural_comparison.ipynb — walkthrough of the models from saved artifacts
 tests/              recovery-from-known-truth tests
 data/               replayed book cache (gitignored)
@@ -597,6 +598,18 @@ Full report: `docs/report-2026-09-13.md`. Configuration frozen in `PROTOCOL.md` 
 **What this does and does not say.** It does not say summaries carry no information (this MLP did not extract it), that attention is ineffective (it is robustly better on the exploratory session), or that training-set size caused the fresh-session result (untested). It says the protocol's replication requirement — the direction on ≥ 2 fresh sessions with intervals clear of zero — is not met after one.
 
 **Decision.** The classical model (M4, or E1′ where it wins on validation) remains the working reference. The attention result is **inconclusive**. Collection batch 1 (`docs/collection-batch-1.md`) — two further 8-hour sessions on different UTC dates, evaluated in capture order under the frozen protocol — answers the one open question: whether the exploratory-session gain appears on independent 8-hour data and survives its untouched test segment. All model extensions wait for it.
+
+### D15 — Batch session 1 (`BTCUSDT-2026-09-14`): the attention advantage replicates on independent 8-hour data (2026-09-15)
+
+Captured under `docs/collection-batch-1.md` (8.50 h, 00:00–08:30 UTC), eligibility and batch rules passed before fitting, run detached under the frozen configuration (`scripts/run_detached.ps1`), 4 h 13 min wall clock. Report §4 in `docs/report-2026-09-13.md`; artifacts `runs/BTCUSDT-2026-09-14/`.
+
+**Classical.** H1, H2, H5, H8 confirmed; H3 not confirmed by a hair (+0.0023 [−0.0001, +0.0045]); H4, H6, H7, H9 not confirmed. E1′ is the reference (+0.0018 over M4). Rate over-prediction on validation once more.
+
+**Neural (77 / 16 / 6 blocks).** Validation: MLP +0.0076 vs E1′ (seed s.d. 0.0014, 3/5 clear); attention **+0.0278** (seed s.d. 0.0046, **5/5 clear** at every block size); attention − MLP paired +0.0202, 5/5 clear. **Final test, once:** MLP +0.0037 (0/5 clear); attention **+0.0339** (seed s.d. 0.0049, **5/5 clear** at every block size).
+
+**Standing under `PROTOCOL.md` §7.** Two fresh sessions evaluated: the 2-hour session did not show the advantage; the 8.5-hour session shows it on validation and test. The 2-hour result stays in the record. **The batch conclusion is pending session 2.** The classical model remains the working reference until then; nothing is tuned; no feature is added.
+
+**Noted, not concluded.** On this session the MLP over activity summaries is marginally ahead of E1′ on validation (3/5 seeds clear) and indistinguishable on test — so "summaries carry nothing" is not what the evidence says, here or before. The remaining gap between attention and everything else is the same size on validation and on test (≈ 0.02–0.03 NLL/event), which is what one would expect of a real difference rather than a selection effect.
 ---
 
 # Open Decisions
