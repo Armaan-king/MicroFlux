@@ -104,3 +104,7 @@ block sizes, split fractions, tercile and mark-class rules.
   outputs, committed together with the run logs.
 - After the batch: D15 in `ARCHITECTURE.md` and a one-line verdict per session
   in `PROTOCOL.md`'s log.
+
+## Log
+
+- **2026-09-15** — the planned 2026-09-15 date was missed (session 1 was still being evaluated). Session 2 is scheduled for UTC date **2026-09-16**, capture 00:00–08:30 UTC, by `scripts/batch_orchestrate.ps1`: one detached process that waits for 00:00 UTC, refuses if a capture is running or the partition exists, runs TickForge's `run_capture.ps1 -Hours 8.5` unchanged, verifies closure, and hands off to `run_detached.ps1`. Rules unchanged; this is an operational deviation only.

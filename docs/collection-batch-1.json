@@ -21,5 +21,11 @@
       "evaluated": "2026-09-14"
     }
   ],
-  "excluded": []
+  "excluded": [],
+  "deviations": [
+    {
+      "when": "2026-09-15",
+      "what": "planned second capture date 2026-09-15 missed while session 1 was being evaluated; session 2 targeted at UTC date 2026-09-16, capture 00:00-08:30 UTC, scheduled by scripts/batch_orchestrate.ps1 (PID recorded in runs/batch-1-orchestrator-2026-09-16.log). Eligibility, evaluation and decision rules unchanged."
+    }
+  ]
 }

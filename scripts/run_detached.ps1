@@ -57,7 +57,7 @@ try {
     $p = Start-Process -FilePath $python -ArgumentList $argv -WorkingDirectory $repo -NoNewWindow -PassThru `
         -RedirectStandardOutput "$log.stdout" -RedirectStandardError $err
     "python PID $($p.Id)" | Out-File -Append -Encoding utf8 $log
-    Wait-Process -Id $p.Id
+    $p.WaitForExit()   # Wait-Process leaves ExitCode empty; WaitForExit populates it
     "=== $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') exit code $($p.ExitCode)" | Out-File -Append -Encoding utf8 $log
 } finally {
     $null = [Win32.Power]::SetThreadExecutionState($RELEASE)
