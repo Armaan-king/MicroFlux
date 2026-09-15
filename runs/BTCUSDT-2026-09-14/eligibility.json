@@ -1,0 +1,11 @@
+{
+  "continuous": true,
+  "snapshots": 1,
+  "span_hours": 8.499808611111112,
+  "orders": 113043,
+  "book_rows": 30599,
+  "first_ns": 1789344020279000000,
+  "last_ns": 1789374619590000000,
+  "fingerprint": "56f7336d685fc703",
+  "eligible": true
+}

@@ -1,0 +1,59 @@
+{
+  "model": "attention",
+  "seed": 0,
+  "N": 64,
+  "width": 64,
+  "layers": 2,
+  "heads": 4,
+  "max_epochs": 40,
+  "min_epochs": 10,
+  "patience": 8,
+  "targets_per_epoch": 40000,
+  "scales_half_life_s": [
+    0.005,
+    0.05,
+    0.5,
+    5.0,
+    50.0
+  ],
+  "summary_windows_s": [
+    1.0,
+    10.0,
+    60.0,
+    300.0,
+    1800.0
+  ],
+  "big_windows_s": [
+    1.0,
+    10.0
+  ],
+  "reference": "E1'",
+  "data": {
+    "root": "C:/tickforge-runs",
+    "symbol": "BTCUSDT",
+    "date": "2026-09-14",
+    "orders": 113043,
+    "first_ns": 1789344020279000000,
+    "last_ns": 1789374619590000000,
+    "fingerprint": "56f7336d685fc703",
+    "split": {
+      "train": [
+        0.0,
+        21419.5177
+      ],
+      "val": [
+        21419.5177,
+        26009.41435
+      ],
+      "test": [
+        26009.41435,
+        30599.311
+      ]
+    }
+  },
+  "code": "c66dcdb9043a014858ede728000c208d9e53bafb+dirty",
+  "torch": "2.14.0+cpu",
+  "numpy": "2.5.3",
+  "python": "3.12.14",
+  "started": "2026-09-14T06:22:25"
+}

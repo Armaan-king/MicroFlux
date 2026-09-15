@@ -98,3 +98,4 @@ Extended-input runs report the gain over the matched-input run of the same archi
 - **2026-09-13** — neural pilot on the exploratory session (D13, superseded): summaries-MLP −0.0020 ± 0.0034 vs E1′; attention N = 64 +0.0164 ± 0.0084, 3/3 seeds clear zero; N = 128 no different. Fresh-session neural runs use N = 64, patience 8, an epoch floor, 5 seeds.
 - **2026-09-13** — test isolation fixed: `evaluate` scored KS on test in every validation script; now validation by default. §7 comparator list includes E1′ and retained combinations; block-size sensitivity and training seeds added.
 - **2026-09-13** — final test scored once on `BTCUSDT-2026-09-09-early` (runs/BTCUSDT-2026-09-09-early/final_test.json).
+- **2026-09-14** — final test scored once on `BTCUSDT-2026-09-14` (runs/BTCUSDT-2026-09-14/final_test.json).
