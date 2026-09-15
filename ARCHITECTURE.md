@@ -603,9 +603,11 @@ Full report: `docs/report-2026-09-13.md`. Configuration frozen in `PROTOCOL.md` 
 
 Captured under `docs/collection-batch-1.md` (8.50 h, 00:00–08:30 UTC), eligibility and batch rules passed before fitting, run detached under the frozen configuration (`scripts/run_detached.ps1`), 4 h 13 min wall clock. Report §4 in `docs/report-2026-09-13.md`; artifacts `runs/BTCUSDT-2026-09-14/`.
 
-**Classical.** H1, H2, H5, H8 confirmed; H3 not confirmed by a hair (+0.0023 [−0.0001, +0.0045]); H4, H6, H7, H9 not confirmed. E1′ is the reference (+0.0018 over M4). Rate over-prediction on validation once more.
+**Classical.** H1, H2, H5 confirmed; H8 confirmed at the primary 60 s block size (its 300 s sensitivity interval includes zero). H3 not confirmed: +0.0023 [−0.0001, +0.0045] fails both the registered >0.005 gain threshold and exclusion of zero. H4, H6, H7, H9 not confirmed. E1′ is the reference (+0.0018 over M4). Rate over-prediction on validation once more.
 
 **Neural (77 / 16 / 6 blocks).** Validation: MLP +0.0076 vs E1′ (seed s.d. 0.0014, 3/5 clear); attention **+0.0278** (seed s.d. 0.0046, **5/5 clear** at every block size); attention − MLP paired +0.0202, 5/5 clear. **Final test, once:** MLP +0.0037 (0/5 clear); attention **+0.0339** (seed s.d. 0.0049, **5/5 clear** at every block size).
+
+The collection batch marks 300 s / 900 s intervals on these 76-minute validation/test windows as insufficient for inference; they are sensitivity results. The primary 60 s result supports the session-level conclusion.
 
 **Standing under `PROTOCOL.md` §7.** Two fresh sessions evaluated: the 2-hour session did not show the advantage; the 8.5-hour session shows it on validation and test. The 2-hour result stays in the record. **The batch conclusion is pending session 2.** The classical model remains the working reference until then; nothing is tuned; no feature is added.
 
